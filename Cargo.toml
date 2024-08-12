@@ -12,11 +12,3 @@ crate-type = ["cdylib"]
 pyo3 = "0.22.0"
 lazy_static = "1.4.0"
 regex = "1"
-
-[package.metadata.maturin]
-name = "thongna"
-version = "0.1.1"
-authors = ["poramehtkh@gmail.com"]
-description = "High-performance Text processing library for Thai language, built with Rust"
-long_description = "file: README.md"
-long_description_content_type = "text/markdown"
