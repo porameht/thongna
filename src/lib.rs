@@ -19,7 +19,7 @@ static NORMALIZE_RULE2: [(&str, &str); 9] = [
 ];
 
 #[pyfunction]
-fn normalize(text: &str, whitespace_number: bool) -> PyResult<String> {
+pub fn normalize(text: &str, whitespace_number: bool) -> PyResult<String> {
     let mut text = text.to_string();
 
     if whitespace_number {
