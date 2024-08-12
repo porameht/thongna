@@ -6,7 +6,11 @@ build-backend = "maturin"
 name = "thongna"
 requires-python = ">=3.8"
 description = "High-performance Text processing library for Thai language, built with Rust"
+authors = [
+  { name="Porameht Khumsombat" },
+]
 keywords = ["thai", "tokenizer", "nlp", "word-segmentation"]
+readme = "README.md"
 classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
