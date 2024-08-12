@@ -47,7 +47,6 @@ pub fn normalize(text: &str, whitespace_number: bool) -> PyResult<String> {
     Ok(text)
 }
 
-
 #[pymodule]
 fn thongna(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(normalize, m)?)?;
