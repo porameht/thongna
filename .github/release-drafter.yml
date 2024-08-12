@@ -1,0 +1,21 @@
+name-template: "v$NEXT_PATCH_VERSION 🌈"
+tag-template: "v$NEXT_PATCH_VERSION"
+categories:
+  - title: "🚀 Features"
+    labels:
+      - "🚀 Feature Request"
+  - title: "🐛 Bug Fixes"
+    labels:
+      - ":bug: Bug"
+  - title: "🧰 Maintenance"
+    label:
+      - "🧰 Maintenance"
+  - title: ":hammer_and_wrench: Engineering"
+    label:
+      - ":hammer_and_wrench: Engineering"
+      - "🦄 Magical Unicorn"
+change-template: "- $TITLE @$AUTHOR (#$NUMBER)"
+template: |
+  ## What’s Changed
+
+  $CHANGES
