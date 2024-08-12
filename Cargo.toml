@@ -15,8 +15,8 @@ regex = "1"
 
 [package.metadata.maturin]
 name = "thongna"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["poramehtkh@gmail.com"]
-description = "Thongna is a high-performance text processing library for the Thai language, built with Rust and exposed as a Python package."
+description = "High-performance Text processing library for Thai language, built with Rust"
 long_description = "file: README.md"
 long_description_content_type = "text/markdown"
