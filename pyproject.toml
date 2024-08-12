@@ -15,5 +15,8 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
 dynamic = ["version"]
+license="Apache Software License 2.0"
 [tool.maturin]
 features = ["pyo3/extension-module"]
+[project.urls]
+repository="https://github.com/porameht/thongna"

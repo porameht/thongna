@@ -48,7 +48,7 @@ We welcome contributions from the community! If you’d like to contribute to Th
 - Submit a pull request with a clear explanation of your changes.
 
 ## License
-Thongna is licensed under the MIT License. See the LICENSE file for more details.
+Thongna is licensed under the Apache License. See the LICENSE file for more details.
 
 ## Contact
 For any questions, suggestions, or issues, feel free to open an issue or contact the maintainers directly.

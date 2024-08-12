@@ -2,6 +2,10 @@
 name = "thongna"
 version = "0.1.2"
 edition = "2021"
+license = "Apache-2.0"
+authors = ["Porameht Khumsombat"]
+description = "High-performance Text processing library for Thai language, built with Rust"
+exclude = ["notebooks"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [lib]
