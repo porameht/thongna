@@ -1,0 +1,22 @@
+[package]
+name = "thongna"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+name = "thongna"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = "0.22.0"
+lazy_static = "1.4.0"
+regex = "1"
+
+[package.metadata.maturin]
+name = "thongna"
+version = "0.1.0"
+authors = ["poramehtkh@gmail.com"]
+description = "Thongna is a high-performance text processing library for the Thai language, built with Rust and exposed as a Python package."
+long_description = "file: README.md"
+long_description_content_type = "text/markdown"
