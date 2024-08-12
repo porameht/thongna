@@ -48,20 +48,8 @@ pub fn normalize(text: &str, whitespace_number: bool) -> PyResult<String> {
 }
 
 
-#[pyfunction]
-fn tokenize(text: &str) -> Vec<String> {
-    text.split_whitespace().map(|s| s.to_string()).collect()
-}
-
-#[pyfunction]
-fn reverse_text(text: &str) -> String {
-    text.chars().rev().collect()
-}
-
 #[pymodule]
 fn thongna(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_function(wrap_pyfunction!(tokenize, m)?)?;
-    m.add_function(wrap_pyfunction!(reverse_text, m)?)?;
     m.add_function(wrap_pyfunction!(normalize, m)?)?;
     Ok(())
 }
