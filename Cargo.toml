@@ -1,15 +1,23 @@
 [package]
 name = "thongna"
-version = "0.2.0"
+version = "0.2.2"
 edition = "2021"
 license = "Apache-2.0"
 authors = ["Porameht Khumsombat"]
 description = "High-performance Text processing library for Thai language, built with Rust"
-exclude = ["notebooks"]
+repository = "https://github.com/porameht/thongna"
+readme = "README.md"
+keywords = ["thai", "tokenizer", "nlp", "word-segmentation"]
+categories = ["text-processing", "internationalization"]
+exclude = [
+    "notebooks",
+    "tests",
+    ".github",
+    ".gitignore",
+]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [lib]
-name = "_thongna"
+name = "thongna"
 crate-type = ["cdylib"]
 
 [dependencies]

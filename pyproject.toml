@@ -4,19 +4,40 @@ build-backend = "maturin"
 
 [project]
 name = "thongna"
+version = "0.2.2"
 requires-python = ">=3.8"
 description = "High-performance Text processing library for Thai language, built with Rust"
-authors = [{ name = "Porameht Khumsombat" }]
+authors = [
+    {name = "Porameht Khumsombat", email = "poramehtkh@gmail.com"}
+]
 keywords = ["thai", "tokenizer", "nlp", "word-segmentation"]
-readme = "README.md"
 classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "License :: OSI Approved :: Apache Software License",
+    "Topic :: Text Processing :: Linguistic",
 ]
-version = "0.2.0"
-license="Apache Software License 2.0"
+license = {text = "Apache-2.0"}
+readme = "README.md"
+
+[project.urls]
+Repository = "https://github.com/porameht/thongna"
+"Bug Tracker" = "https://github.com/porameht/thongna/issues"
+
 [tool.maturin]
 features = ["pyo3/extension-module"]
-[project.urls]
-repository="https://github.com/porameht/thongna"
+module-name = "_thongna"
+python-source = "thongna"
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q"
+testpaths = [
+    "tests",
+]

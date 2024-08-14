@@ -1,40 +1,32 @@
 # Thongna 🌾
 
-**Thongna** (ท้องนา) is a high-performance text processing library for the Thai language, built with Rust and exposed as a Python package. Designed to handle the complexities of Thai text with the speed and efficiency that Rust provides, Thongna is perfect for developers looking to integrate advanced text processing features into their applications.
+**Thongna** (ท้องนา) is a high-performance text processing library for the Thai language, built with Rust and exposed as a Python package. Inspired by [PyThaiNLP](https://github.com/PyThaiNLP/pythainlp), Thongna aims to provide efficient Thai language processing tools with the speed and reliability of Rust.
 
 ## Features
-- **Efficient Thai text normalization**: Clean and standardize Thai text by removing or replacing special characters, whitespace, and more.
+- **Efficient Thai word segmentation**: Break Thai text into meaningful tokens using the NewMM algorithm.
 - **Fast and reliable**: Built with Rust, Thongna offers the performance you need for large-scale text processing.
 - **Python integration**: Easily use Thongna in your Python projects with its simple and intuitive API.
+- **Custom dictionary support**: Load and use custom dictionaries for specialized segmentation tasks.
+- **Text normalization**: Standardize Thai text by handling common inconsistencies and variations.
+- **Parallel processing**: Utilize multi-core processors for faster processing of large texts.
+- **Safe mode**: Prevent infinite loops in tokenization for extra reliability.
+
+## Project Details
+- **Version**: 0.2.2 (as of the latest release)
+- **License**: Apache-2.0
+- **Supported Python versions**: 3.8+
+- **Rust edition**: 2021
+- **Key dependencies**:
+  - PyO3 for Rust-Python interoperability
+  - Rayon for parallel processing
+  - Regex for text manipulation
+- **CI/CD**: Utilizes GitHub Actions for automated testing and building on multiple platforms (Linux, macOS, Windows)
+- **Package distribution**: Available on PyPI, with pre-built wheels for various platforms and architectures
 
 ## Installation
 
-To install Thongna, ensure you have Python and Rust installed, then use `pip`:
+To install Thongna, ensure you have Python 3.8+ installed, then use `pip`:
 
-```bash
-pip install thongna
-```
-
-Usage
-Here's a quick example of how to use Thongna for basic text processing:
-
-```python
-import thongna
-
-# Example text
-thai_text = "สวัสดีค่ะ! นี่คือทดสอบการใช้งาน Thongna 🌾"
-
-# Normalize the text
-normalized_text = thongna.normalize_text(thai_text)
-
-print("Normalized Text:", normalized_text)
-```
-
-## Functions
-
-- normalize_text(text: str) -> str: Normalize Thai text by cleaning up unwanted characters and ensuring consistent formatting.
-- replace_characters(text: str, replacements: dict) -> str: Replace specific characters in the text based on a given dictionary of replacements.
-- More features to come...
 
 ## Why Thongna? 🌾
 

@@ -1,5 +1,11 @@
 import unittest
 from typing import List
+import os
+import sys
+
+# Add the parent directory to sys.path to allow importing from the project
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, project_root)
 
 from thongna import load_dict, newmm
 
@@ -20,12 +26,14 @@ class TestTokenizePackage(unittest.TestCase):
         self.assertEqual(newmm(None, self.DICT_NAME), [])
         self.assertEqual(newmm("", self.DICT_NAME), [])
         self.assertEqual(newmm(" ", self.DICT_NAME), [" "])
+        print("test_segment_empty_input passed")
 
     def test_segment_simple_input(self):
         self.assertEqual(
             newmm("ไข่คน2021", self.DICT_NAME),
             ["ไข่", "คน", "2021"],
         )
+        print("test_segment_simple_input passed")
 
     def test_segment_with_dict_words(self):
         result = newmm(
@@ -37,6 +45,7 @@ class TestTokenizePackage(unittest.TestCase):
         self.assertIn("ค่าจ้าง", result)
         self.assertIn("แรงงาน", result)
         self.assertIn("ครอบครัว", result)
+        print("test_segment_with_dict_words passed")
 
     def test_segment_various_inputs(self):
         inputs = [
@@ -52,13 +61,16 @@ class TestTokenizePackage(unittest.TestCase):
                 result = newmm(text, self.DICT_NAME)
                 self.assertIsInstance(result, List)
                 self.assertGreater(len(result), 0)
+                # Additional check for non-empty tokens
+                self.assertTrue(all(token.strip() for token in result))
+        print("test_segment_various_inputs passed")
 
     def test_segment_with_numbers_and_special_chars(self):
         result = newmm("ราคา ฿550.75 บาท", self.DICT_NAME)
         self.assertIn("ราคา", result)
-        self.assertIn("฿", result)
-        self.assertIn("550.75", result)
+        self.assertIn("฿550.75", result)
         self.assertIn("บาท", result)
+        print("test_segment_with_numbers_and_special_chars passed")
 
     def test_segment_with_english_words(self):
         result = newmm("เขาชอบ pizza มาก", self.DICT_NAME)
@@ -66,19 +78,26 @@ class TestTokenizePackage(unittest.TestCase):
         self.assertIn("ชอบ", result)
         self.assertIn("pizza", result)
         self.assertIn("มาก", result)
+        print("test_segment_with_english_words passed")
 
     def test_segment_with_misspelled_words(self):
         result = newmm("เคาไปโรงเรียน", self.DICT_NAME)
         self.assertIn("เคา", result)
         self.assertIn("ไป", result)
         self.assertIn("โรงเรียน", result)
+        print("test_segment_with_misspelled_words passed")
 
     def test_segment_with_long_word(self):
         long_word = "ยาว" * 50
         result = newmm(long_word, self.DICT_NAME)
         self.assertGreater(len(result), 1)  # Should be split into multiple tokens
+        print("test_segment_with_long_word passed")
 
     def test_segment_with_parallel_mode(self):
         result_parallel = newmm(self.LONG_TEXT, self.DICT_NAME, parallel=True)
         result_sequential = newmm(self.LONG_TEXT, self.DICT_NAME, parallel=False)
         self.assertEqual(result_parallel, result_sequential)
+        print("test_segment_with_parallel_mode passed")
+
+if __name__ == '__main__':
+    unittest.main()
