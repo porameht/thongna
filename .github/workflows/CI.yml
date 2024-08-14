@@ -158,7 +158,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: debian-package
-          path: dist/*.deb
+          path: dist
 
   sdist:
     runs-on: ubuntu-latest
