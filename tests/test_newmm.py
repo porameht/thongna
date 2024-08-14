@@ -3,7 +3,6 @@ from typing import List
 import os
 import sys
 
-# Add the parent directory to sys.path to allow importing from the project
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, project_root)
 
