@@ -153,7 +153,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           command: sdist
-          args: --release --out dist
+          args: --out dist
       - name: Upload Debian package
         uses: actions/upload-artifact@v4
         with:
@@ -178,7 +178,7 @@ jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
-    if: "startsWith(github.ref, 'refs/tags/')"
+    if: startsWith(github.ref, 'refs/tags/')
     needs: [linux, musllinux, windows, macos, debian, sdist]
     steps:
       - uses: actions/download-artifact@v4
