@@ -1,9 +1,9 @@
 from pathlib import Path
 from typing import List, Tuple
 
-from _thongna import load_dict as rust_load_dict  # type: ignore
-from _thongna import newmm as rust_newmm  # type: ignore
-
+from thongna import load_dict as rust_load_dict  # type: ignore
+from thongna import newmm as rust_newmm  # type: ignore
+from thongna import normalize as rust_normalize # type: ignore
 
 def load_dict(file_path: str, dict_name: str) -> Tuple[str, bool]:
     """
@@ -50,3 +50,20 @@ def newmm(
         return []
 
     return rust_newmm(text, dict_name, safe, parallel)
+
+def normalize(text: str, whitespace_number: bool = True) -> str:
+    """
+    Normalize Thai text.
+
+    This function normalizes Thai text by applying various rules to standardize
+    the text representation.
+
+    Args:
+        text (str): Input text to be normalized
+        whitespace_number (bool, optional): If True, adds spaces around numbers. 
+                                            Defaults to True.
+
+    Returns:
+        str: Normalized text
+    """
+    return rust_normalize(text, whitespace_number)

@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "thongna"
-version = "0.2.3"
+version = "0.2.4"
 requires-python = ">=3.8"
 description = "Blazing-fast Thai text processing library powered by Rust"
 authors = [
@@ -32,7 +32,7 @@ Repository = "https://github.com/porameht/thongna"
 
 [tool.maturin]
 features = ["pyo3/extension-module"]
-module-name = "_thongna"
+module-name = "thongna"
 python-source = "thongna"
 
 [tool.pytest.ini_options]

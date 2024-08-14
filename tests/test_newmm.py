@@ -1,12 +1,6 @@
 import unittest
 from typing import List
-import os
-import sys
-
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-sys.path.insert(0, project_root)
-
-from thongna import load_dict, newmm
+from thongna_py import newmm, load_dict
 
 class TestTokenizePackage(unittest.TestCase):
     def setUp(self):

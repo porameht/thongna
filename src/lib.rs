@@ -38,7 +38,20 @@ lazy_static! {
 }
 
 #[pyfunction]
+#[pyo3(text_signature = "(text, whitespace_number=True)")]
 pub fn normalize(text: &str, whitespace_number: bool) -> PyResult<String> {
+    // Normalize Thai text.
+    //
+    // This function normalizes Thai text by applying various rules to standardize
+    // the text representation.
+    //
+    // Args:
+    //     text (str): Input text to be normalized
+    //     whitespace_number (bool, optional): If True, adds spaces around numbers. 
+    //                                         Defaults to True.
+    //
+    // Returns:
+    //     str: Normalized text
     let mut text = text.to_string();
 
     if whitespace_number {
@@ -66,7 +79,22 @@ pub fn normalize(text: &str, whitespace_number: bool) -> PyResult<String> {
 }
 
 #[pyfunction]
+#[pyo3(text_signature = "(text, dict_name, safe=False, parallel=False)")]
 fn newmm(text: &str, dict_name: &str, safe: bool, parallel: bool) -> PyResult<Vec<String>> {
+    // Break text into tokens.
+    //
+    // This method is an implementation of newmm segmentation.
+    // Supports multithread mode - set by parallel flag.
+    //
+    // Args:
+    //     text (str): Input text
+    //     dict_name (str): Dictionary name, as assigned in load_dict()
+    //     safe (bool, optional): Use safe mode to avoid long waiting time in
+    //         a text with lots of ambiguous word boundaries. Defaults to False.
+    //     parallel (bool, optional): Use multithread mode. Defaults to False.
+    //
+    // Returns:
+    //     List[str]: List of tokens
     if let Some(loaded_dict) = DICT_COLLECTION.read().unwrap().get(dict_name) {
         let result = loaded_dict.segment_to_string(text, safe, parallel);
         Ok(result)
@@ -79,7 +107,20 @@ fn newmm(text: &str, dict_name: &str, safe: bool, parallel: bool) -> PyResult<Ve
 }
 
 #[pyfunction]
+#[pyo3(text_signature = "(file_path, dict_name)")]
 fn load_dict(file_path: &str, dict_name: &str) -> PyResult<(String, bool)> {
+    // Load dictionary from a file.
+    //
+    // Load a dictionary file into an in-memory dictionary collection,
+    // and assign dict_name to it.
+    // This function does not override an existing dict name.
+    //
+    // Args:
+    //     file_path (str): Path to a dictionary file
+    //     dict_name (str): A unique dictionary name, used for reference
+    //
+    // Returns:
+    //     Tuple[str, bool]: A tuple containing a human-readable result string and a boolean
     let mut dict_col_lock = DICT_COLLECTION.write().unwrap();
     if dict_col_lock.get(dict_name).is_some() {
         Ok((
@@ -104,7 +145,7 @@ fn load_dict(file_path: &str, dict_name: &str) -> PyResult<(String, bool)> {
 }
 
 #[pymodule]
-fn _thongna(m: &Bound<'_, PyModule>) -> PyResult<()> {
+fn thongna(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(normalize, m)?)?;
     m.add_function(wrap_pyfunction!(newmm, m)?)?;
     m.add_function(wrap_pyfunction!(load_dict, m)?)?;
