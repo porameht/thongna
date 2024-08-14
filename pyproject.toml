@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "thongna"
-version = "0.2.2"
+version = "0.2.3"
 requires-python = ">=3.8"
 description = "Blazing-fast Thai text processing library powered by Rust"
 authors = [
