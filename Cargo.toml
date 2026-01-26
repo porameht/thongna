@@ -18,10 +18,8 @@ exclude = [
 
 [lib]
 name = "thongna"
-crate-type = ["cdylib"]
 
 [dependencies]
-pyo3 = "0.22.0"
 regex = "1"
 anyhow = "1.0.45"
 bytecount = "0.6.2"

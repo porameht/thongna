@@ -8,7 +8,8 @@ use rustc_hash::FxHashSet as HashSet;
 /// Returns a set of "character" indices at the end of each token
 #[inline]
 pub fn tcc_pos(custom_text_type: &CustomStringBytesSlice) -> HashSet<usize> {
-    let mut set = HashSet::with_capacity_and_hasher(custom_text_type.chars_len() / 10, Default::default());
+    let mut set =
+        HashSet::with_capacity_and_hasher(custom_text_type.chars_len() / 10, Default::default());
     let mut txt = custom_text_type;
     let mut position: usize = 0;
 

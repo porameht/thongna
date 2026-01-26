@@ -1,2 +1,2 @@
-pub(crate) mod tokenizer;
 pub(crate) mod rules;
+pub(crate) mod tokenizer;

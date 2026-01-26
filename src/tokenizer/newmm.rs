@@ -6,9 +6,9 @@ use super::{
     traits::Tokenizer,
     trie::TrieChar as Trie,
 };
+use crate::encoding::fixed_width::{rfind_space_char_index, CustomString, BYTES_PER_CHAR};
 use crate::encoding::fixed_width::{CustomStringBytesSlice, FixedCharsLengthByteSlice};
 use crate::encoding::regex::regex_pattern_to_custom_pattern;
-use crate::encoding::fixed_width::{rfind_space_char_index, CustomString, BYTES_PER_CHAR};
 
 use anyhow::Result as AnyResult;
 use binary_heap_plus::{BinaryHeap, MinComparator};
@@ -41,14 +41,13 @@ static NON_THAI_PATTERN: Lazy<Regex> = Lazy::new(|| {
             .iter()
             .map(|p| regex_pattern_to_custom_pattern(p).unwrap())
             .collect::<Vec<_>>()
-            .join("|")
+            .join("|"),
     )
     .unwrap()
 });
 
-static THAI_TWOCHARS_PATTERN: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(&regex_pattern_to_custom_pattern(r"^[ก-ฮ]{0,2}$").unwrap()).unwrap()
-});
+static THAI_TWOCHARS_PATTERN: Lazy<Regex> =
+    Lazy::new(|| Regex::new(&regex_pattern_to_custom_pattern(r"^[ก-ฮ]{0,2}$").unwrap()).unwrap());
 
 #[derive(Clone, Debug)]
 struct BFSSearchError {
@@ -172,20 +171,21 @@ impl NewmmTokenizer {
         position_list.push(0);
         existing_candidate.insert(0);
         let mut end_position: CharacterIndex = 0;
-        
+
         while let Some(begin_position) = position_list.pop() {
             if begin_position >= text_length {
                 break;
             }
-            
+
             let sub_text_prefix = text.substring(begin_position, text.chars_len());
             let prefixes = Trie::prefix_ref(&sub_text_prefix, custom_dict);
-            
+
             for word in prefixes {
                 let word_length = word.chars_len();
                 let end_position_candidate = begin_position + word_length;
                 if valid_position.contains(&end_position_candidate) {
-                    graph.entry(begin_position)
+                    graph
+                        .entry(begin_position)
                         .or_default()
                         .push(end_position_candidate);
 
@@ -199,7 +199,7 @@ impl NewmmTokenizer {
                     }
                 }
             }
-            
+
             let position_list_length = position_list.len();
             if position_list_length == 1 {
                 if let Some(first_position_list) = position_list.peek() {
@@ -242,7 +242,8 @@ impl NewmmTokenizer {
                                         .into_par_iter()
                                         .filter(|word| {
                                             let new_position = position + word.chars_len();
-                                            valid_position.contains(&new_position) && !THAI_TWOCHARS_PATTERN.is_match(word)
+                                            valid_position.contains(&new_position)
+                                                && !THAI_TWOCHARS_PATTERN.is_match(word)
                                         })
                                         .collect();
 
@@ -258,9 +259,7 @@ impl NewmmTokenizer {
                     }
                 }
 
-                graph.entry(begin_position)
-                    .or_default()
-                    .push(end_position);
+                graph.entry(begin_position).or_default().push(end_position);
                 graph_size += 1;
                 let token_bytes = text.substring_as_bytes(begin_position, end_position);
                 result_str.push(token_bytes);
@@ -308,8 +307,12 @@ impl NewmmTokenizer {
                             .enumerate()
                             .max_by_key(|(_, token)| token.chars_len())
                             .unwrap();
-                        
-                        TEXT_SCAN_BEGIN + word_tokens[..token_max_index].iter().map(|token| token.chars_len()).sum::<usize>()
+
+                        TEXT_SCAN_BEGIN
+                            + word_tokens[..token_max_index]
+                                .iter()
+                                .map(|token| token.chars_len())
+                                .sum::<usize>()
                     });
 
                 txt_parts.push(txt.substring(0, cut_pos));

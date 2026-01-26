@@ -48,7 +48,10 @@ impl Display for UnsupportedCustomRegexParserError {
                 write!(f, "Repetition range is not supported")
             }
             UnsupportedCustomRegexParserError::AnchorStartLine => {
-                write!(f, "Start line anchor (^) is not supported in multiline mode")
+                write!(
+                    f,
+                    "Start line anchor (^) is not supported in multiline mode"
+                )
             }
             UnsupportedCustomRegexParserError::AnchorEndLine => {
                 write!(f, "End line anchor ($) is not supported in multiline mode")
