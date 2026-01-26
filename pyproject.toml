@@ -33,7 +33,7 @@ Repository = "https://github.com/porameht/thongna"
 [tool.maturin]
 features = ["pyo3/extension-module"]
 module-name = "thongna"
-python-source = "thongna"
+python-source = "thongna_py"
 
 [tool.pytest.ini_options]
 minversion = "6.0"
