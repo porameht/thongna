@@ -1,4 +1,4 @@
-use crate::bytes_str::custom_string::{
+use crate::encoding::fixed_width::{
     CustomString, CustomStringBytesSlice, CustomStringBytesVec, FixedCharsLengthByteSlice,
 };
 
@@ -7,7 +7,6 @@ use std::borrow::BorrowMut;
 
 #[derive(Debug)]
 struct TrieNode {
-    ///
     children: HashMap<char, Self>,
     end: bool,
 }
@@ -53,7 +52,7 @@ impl TrieNode {
         }
         self.children
             .entry(*input_word.get_chars_content().first().unwrap())
-            .or_insert_with(TrieNode::new)
+            .or_default()
             .add_word(&input_word.substring(1, input_word.chars_len()));
     }
 
@@ -156,7 +155,7 @@ impl TrieChar {
                     break;
                 }
             }
-            current_index = current_index + 1;
+            current_index += 1;
         }
         result
     }

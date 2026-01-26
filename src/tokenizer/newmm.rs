@@ -1,18 +1,18 @@
 use std::{collections::VecDeque, error::Error, fmt::Display, path::PathBuf};
 
 use super::{
-    dict_reader::{create_dict_trie, DictSource},
-    tcc::tcc_tokenizer,
-    tokenizer_trait::Tokenizer,
-    trie_char::TrieChar as Trie,
+    dictionary::{create_dict_trie, DictSource},
+    tcc::tokenizer as tcc_tokenizer,
+    traits::Tokenizer,
+    trie::TrieChar as Trie,
 };
-use crate::bytes_str::custom_string::{CustomStringBytesSlice, FixedCharsLengthByteSlice};
-use crate::bytes_str::custom_regex::regex_pattern_to_custom_pattern;
-use crate::bytes_str::custom_string::{rfind_space_char_index, CustomString, BYTES_PER_CHAR};
+use crate::encoding::fixed_width::{CustomStringBytesSlice, FixedCharsLengthByteSlice};
+use crate::encoding::regex::regex_pattern_to_custom_pattern;
+use crate::encoding::fixed_width::{rfind_space_char_index, CustomString, BYTES_PER_CHAR};
 
 use anyhow::Result as AnyResult;
 use binary_heap_plus::{BinaryHeap, MinComparator};
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use rayon::prelude::*;
 use regex::bytes::Regex;
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
@@ -35,27 +35,26 @@ const NON_THAI_READABLE_PATTERN: &[&str; 5] = &[
     r"(?x)^\r?\n",
 ];
 
-lazy_static! {
-    static ref NON_THAI_PATTERN: Regex = Regex::new(
+static NON_THAI_PATTERN: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(
         &NON_THAI_READABLE_PATTERN
             .iter()
             .map(|p| regex_pattern_to_custom_pattern(p).unwrap())
             .collect::<Vec<_>>()
             .join("|")
     )
-    .unwrap();
-}
+    .unwrap()
+});
 
-lazy_static! {
-    static ref THAI_TWOCHARS_PATTERN: Regex =
-        Regex::new(&regex_pattern_to_custom_pattern(r"^[ก-ฮ]{0,2}$").unwrap()).unwrap();
-}
+static THAI_TWOCHARS_PATTERN: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(&regex_pattern_to_custom_pattern(r"^[ก-ฮ]{0,2}$").unwrap()).unwrap()
+});
 
 #[derive(Clone, Debug)]
 struct BFSSearchError {
-    graph: HashMap<CharacterIndex, Vec<CharacterIndex>>,
     start: CharacterIndex,
     goal: CharacterIndex,
+    graph_size: usize,
 }
 
 impl BFSSearchError {
@@ -66,9 +65,9 @@ impl BFSSearchError {
         goal: CharacterIndex,
     ) -> Self {
         Self {
-            graph: graph.clone(),
             start,
             goal,
+            graph_size: graph.len(),
         }
     }
 }
@@ -77,8 +76,8 @@ impl Display for BFSSearchError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Cannot find goal position {} with start position {} with graph {:?}",
-            self.goal, self.start, self.graph
+            "Cannot find path from position {} to {} (graph has {} nodes)",
+            self.start, self.goal, self.graph_size
         )
     }
 }
@@ -87,23 +86,21 @@ impl Error for BFSSearchError {}
 
 #[derive(Debug)]
 pub struct NewmmTokenizer {
-    dict: Box<Trie>,
+    dict: Trie,
 }
 
 impl NewmmTokenizer {
     /// Create a new tokenizer using a dictionary from a text file
     pub fn new(dict_path: &str) -> Self {
         NewmmTokenizer {
-            dict: Box::from(
-                create_dict_trie(DictSource::FilePath(PathBuf::from(dict_path))).unwrap(),
-            ),
+            dict: create_dict_trie(DictSource::FilePath(PathBuf::from(dict_path))).unwrap(),
         }
     }
 
     /// Create a new tokenizer using a dictionary from a vector of Strings
     pub fn from_word_list(word_list: Vec<String>) -> Self {
         NewmmTokenizer {
-            dict: Box::from(create_dict_trie(DictSource::WordList(word_list)).unwrap()),
+            dict: create_dict_trie(DictSource::WordList(word_list)).unwrap(),
         }
     }
 
@@ -189,7 +186,7 @@ impl NewmmTokenizer {
                 let end_position_candidate = begin_position + word_length;
                 if valid_position.contains(&end_position_candidate) {
                     graph.entry(begin_position)
-                        .or_insert_with(Vec::new)
+                        .or_default()
                         .push(end_position_candidate);
 
                     graph_size += 1;
@@ -262,7 +259,7 @@ impl NewmmTokenizer {
                 }
 
                 graph.entry(begin_position)
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push(end_position);
                 graph_size += 1;
                 let token_bytes = text.substring_as_bytes(begin_position, end_position);

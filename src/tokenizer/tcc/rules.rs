@@ -1,5 +1,5 @@
-use crate::bytes_str::custom_regex::regex_pattern_to_custom_pattern;
-use lazy_static::lazy_static;
+use crate::encoding::regex::regex_pattern_to_custom_pattern;
+use once_cell::sync::Lazy;
 use regex::bytes::Regex;
 
 #[inline(always)]
@@ -11,8 +11,8 @@ pub fn replace_tcc_symbol(tcc_pattern: &str) -> String {
         .replace('d', "ูุ")
 }
 
-lazy_static! {
-    pub static ref NON_LOOKAHEAD_TCC: Regex = Regex::new(
+pub static NON_LOOKAHEAD_TCC: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(
         &[
             r"^เc็ck",
             r"^เcctาะk",
@@ -49,9 +49,11 @@ lazy_static! {
         .collect::<Vec<_>>()
         .join("|")
     )
-    .unwrap();
+    .unwrap()
+});
 
-    pub static ref LOOKAHEAD_TCC: Regex = Regex::new(
+pub static LOOKAHEAD_TCC: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(
         &[
             r"^(เccีtย)[เ-ไก-ฮ]k",
             r"^(เc[ิีุู]tย)[เ-ไก-ฮ]k"
@@ -61,8 +63,8 @@ lazy_static! {
         .collect::<Vec<_>>()
         .join("|")
     )
-    .unwrap();
-}
+    .unwrap()
+});
 
 #[cfg(test)]
 mod tests {

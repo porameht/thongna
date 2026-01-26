@@ -1,6 +1,6 @@
-use super::tcc_rules::{LOOKAHEAD_TCC, NON_LOOKAHEAD_TCC};
+use super::rules::{LOOKAHEAD_TCC, NON_LOOKAHEAD_TCC};
 
-use crate::bytes_str::custom_string::{
+use crate::encoding::fixed_width::{
     CustomStringBytesSlice, FixedCharsLengthByteSlice, BYTES_PER_CHAR,
 };
 use rustc_hash::FxHashSet as HashSet;
@@ -41,7 +41,7 @@ pub fn tcc_pos(custom_text_type: &CustomStringBytesSlice) -> HashSet<usize> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bytes_str::custom_string::CustomString;
+    use crate::encoding::fixed_width::CustomString;
 
     #[test]
     fn test_cluster_karan() {

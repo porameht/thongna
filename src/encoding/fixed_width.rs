@@ -97,7 +97,7 @@ impl FixedCharsLengthByteSlice for &CustomStringBytesSlice {
     }
 
     fn is_valid_custom_str_bytes(&self) -> bool {
-        if self.len() % 4 != 0 {
+        if !self.len().is_multiple_of(4) {
             return false;
         }
         for index in 0..self.chars_len() {
@@ -203,7 +203,7 @@ fn to_four_bytes(input: &str) -> CustomStringBytesVec {
 fn trim_to_std_utf8(
     input: &CustomStringBytesSlice,
 ) -> Result<PreparedCustomBytes, Box<dyn error::Error>> {
-    if input.len() % 4 != 0 {
+    if !input.len().is_multiple_of(4) {
         Err(InvalidCustomStringByteError::new_invalid_length(input).into())
     } else {
         match input {
@@ -322,25 +322,33 @@ impl CustomString {
     }
 
     pub fn trim(&self) -> Self {
-        let mut new_content: &[u8] = &self.content;
+        let raw = self.raw_content();
+        let chars = self.get_chars_content();
 
-        while !new_content.is_empty() && is_whitespace(&new_content[0..BYTES_PER_CHAR]) {
-            // trim left
-            new_content = &new_content[BYTES_PER_CHAR..];
-        }
+        let mut trim_start: usize = 0;
+        let mut trim_end: usize = self.chars_len();
 
-        while !new_content.is_empty()
-            && is_whitespace(&new_content[(new_content.len() - BYTES_PER_CHAR)..])
+        // trim left
+        while trim_start < trim_end
+            && is_whitespace(&raw[trim_start * BYTES_PER_CHAR..(trim_start + 1) * BYTES_PER_CHAR])
         {
-            // trim right
-            new_content = &new_content[..(new_content.len() - BYTES_PER_CHAR)];
+            trim_start += 1;
         }
 
+        // trim right
+        while trim_end > trim_start
+            && is_whitespace(&raw[(trim_end - 1) * BYTES_PER_CHAR..trim_end * BYTES_PER_CHAR])
+        {
+            trim_end -= 1;
+        }
+
+        let new_content = Vec::from(&raw[trim_start * BYTES_PER_CHAR..trim_end * BYTES_PER_CHAR]);
+        let new_chars: Vec<char> = chars[trim_start..trim_end].to_vec();
         let length = new_content.len() / BYTES_PER_CHAR;
 
         Self {
-            content: Arc::new(Vec::from(new_content)),
-            chars_content: self.chars_content.clone(),
+            content: Arc::new(new_content),
+            chars_content: Arc::new(new_chars),
             start: 0,
             end: length,
         }
@@ -361,67 +369,42 @@ impl CustomString {
             .unwrap()
     }
 
-    pub fn convert_raw_bytes_to_std_string(input: &[u8]) -> String {
-        let mut output_content: Vec<u8> = Vec::with_capacity(input.len() / 100);
-        for index in 0..input.chars_len() {
-            let extracted_bytes =
-                trim_to_std_utf8(input.slice_by_char_indice(index, index + 1)).unwrap();
-            match extracted_bytes {
-                (None, None, None, Some(first_byte)) => {
-                    output_content.push(first_byte);
-                }
-                (None, None, Some(first_byte), Some(second_byte)) => {
-                    output_content.push(first_byte);
-                    output_content.push(second_byte);
-                }
-                (None, Some(first_byte), Some(second_byte), Some(third_byte)) => {
-                    output_content.push(first_byte);
-                    output_content.push(second_byte);
-                    output_content.push(third_byte);
-                }
-                (Some(first_byte), Some(second_byte), Some(third_byte), Some(fourth_byte)) => {
-                    output_content.push(first_byte);
-                    output_content.push(second_byte);
-                    output_content.push(third_byte);
-                    output_content.push(fourth_byte);
-                }
-                _ => panic!("error"),
-            }
-        }
-        let output =
-            unsafe { String::from(std::str::from_utf8_unchecked(output_content.as_slice())) };
-        output
-    }
-
+    /// Converts fixed-width 4-byte representation back to standard UTF-8 bytes.
+    /// Capacity is estimated at 3/4 of input (most Thai chars are 3 bytes).
     pub fn convert_raw_bytes_to_utf8_bytes(input: &[u8]) -> Vec<u8> {
-        let mut output_content: Vec<u8> = Vec::with_capacity(input.len() / 100);
+        // Estimate capacity: Thai chars are typically 3 bytes, ASCII is 1 byte
+        // Using 3/4 of input length as a reasonable estimate
+        let mut output_content: Vec<u8> = Vec::with_capacity(input.len() * 3 / 4);
         for index in 0..input.chars_len() {
             let extracted_bytes =
                 trim_to_std_utf8(input.slice_by_char_indice(index, index + 1)).unwrap();
             match extracted_bytes {
-                (None, None, None, Some(first_byte)) => {
-                    output_content.push(first_byte);
+                (None, None, None, Some(b1)) => {
+                    output_content.push(b1);
                 }
-                (None, None, Some(first_byte), Some(second_byte)) => {
-                    output_content.push(first_byte);
-                    output_content.push(second_byte);
+                (None, None, Some(b1), Some(b2)) => {
+                    output_content.extend_from_slice(&[b1, b2]);
                 }
-                (Some(first_byte), Some(second_byte), Some(third_byte), None) => {
-                    output_content.push(first_byte);
-                    output_content.push(second_byte);
-                    output_content.push(third_byte);
+                (None, Some(b1), Some(b2), Some(b3)) => {
+                    output_content.extend_from_slice(&[b1, b2, b3]);
                 }
-                (Some(first_byte), Some(second_byte), Some(third_byte), Some(fourth_byte)) => {
-                    output_content.push(first_byte);
-                    output_content.push(second_byte);
-                    output_content.push(third_byte);
-                    output_content.push(fourth_byte);
+                (Some(b1), Some(b2), Some(b3), Some(b4)) => {
+                    output_content.extend_from_slice(&[b1, b2, b3, b4]);
                 }
-                _ => panic!("error"),
+                _ => panic!("Invalid fixed-width byte sequence"),
             }
         }
         output_content.shrink_to_fit();
         output_content
+    }
+
+    /// Converts fixed-width 4-byte representation back to a standard UTF-8 String.
+    #[inline]
+    pub fn convert_raw_bytes_to_std_string(input: &[u8]) -> String {
+        let bytes = Self::convert_raw_bytes_to_utf8_bytes(input);
+        // SAFETY: convert_raw_bytes_to_utf8_bytes only produces valid UTF-8 bytes
+        // from validated fixed-width input
+        unsafe { String::from_utf8_unchecked(bytes) }
     }
 
     /// The result substring contains an atomic RC to the same full Vec<u8> as the caller's content.  

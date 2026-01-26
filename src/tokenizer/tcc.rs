@@ -1,2 +1,2 @@
-pub(crate) mod tcc_tokenizer;
-pub(crate) mod tcc_rules;
+pub(crate) mod tokenizer;
+pub(crate) mod rules;

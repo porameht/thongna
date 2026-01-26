@@ -1,18 +1,20 @@
+// PyO3 macros trigger false positive clippy warnings about useless conversions
+#![allow(clippy::useless_conversion)]
+
 use pyo3::prelude::*;
 use std::collections::HashMap;
 use std::sync::RwLock;
 use crate::tokenizer::newmm::NewmmTokenizer;
-use crate::tokenizer::tokenizer_trait::Tokenizer;
+use crate::tokenizer::traits::Tokenizer;
 
 use pyo3::{exceptions, wrap_pyfunction};
 use regex::Regex;
-use lazy_static::lazy_static;
 use once_cell::sync::Lazy;
 
 pub mod tokenizer;
-pub mod bytes_str;
+pub mod encoding;
 
-static DICT_COLLECTION: Lazy<RwLock<HashMap<String, Box<NewmmTokenizer>>>> = Lazy::new(|| RwLock::new(HashMap::new()));
+static DICT_COLLECTION: Lazy<RwLock<HashMap<String, NewmmTokenizer>>> = Lazy::new(|| RwLock::new(HashMap::new()));
 
 static NORMALIZE_RULE1: [&str; 23] = [
     "ะ", "ั", "็", "า", "ิ", "ี", "ึ", "่", "ํ", "ุ", "ู", "ใ", "ไ", "โ", "ื", "่", "้", "๋", "๊", "ึ", "์", "๋", "ำ"
@@ -30,12 +32,27 @@ static NORMALIZE_RULE2: [(&str, &str); 9] = [
     ("(์)([ัิ-ู])", "\\2\\1")
 ];
 
-lazy_static! {
-    static ref WHITESPACE_NUMBER_RE: Regex = Regex::new(r"([0-9]+)").unwrap();
-    static ref MULTIPLE_SPACES_RE: Regex = Regex::new(r" {2,}").unwrap();
-    static ref MULTIPLE_TABS_RE: Regex = Regex::new(r"\t{2,}").unwrap();
-    static ref MULTIPLE_NEWLINES_RE: Regex = Regex::new(r"\n{2,}").unwrap();
-}
+// Pre-compiled regex patterns using once_cell for consistency
+static WHITESPACE_NUMBER_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"([0-9]+)").unwrap());
+static MULTIPLE_SPACES_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r" {2,}").unwrap());
+static MULTIPLE_TABS_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\t{2,}").unwrap());
+static MULTIPLE_NEWLINES_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\n{2,}").unwrap());
+
+static NORMALIZE_RULE2_COMPILED: Lazy<Vec<(Regex, &'static str)>> = Lazy::new(|| {
+    let tone_marks = "[่้๊๋]";
+    NORMALIZE_RULE2.iter().map(|(pattern, replacement)| {
+        let compiled_pattern = pattern.replace("t", tone_marks);
+        (Regex::new(&compiled_pattern).expect("Invalid NORMALIZE_RULE2 pattern"), *replacement)
+    }).collect()
+});
+
+static NORMALIZE_RULE1_COMPILED: Lazy<Vec<(Regex, &'static str)>> = Lazy::new(|| {
+    let tone_marks = "[่้๊๋]";
+    NORMALIZE_RULE1.iter().map(|rule| {
+        let pattern = format!("{}+", rule.replace("t", tone_marks));
+        (Regex::new(&pattern).expect("Invalid NORMALIZE_RULE1 pattern"), *rule)
+    }).collect()
+});
 
 #[pyfunction]
 #[pyo3(text_signature = "(text, whitespace_number=True)")]
@@ -63,16 +80,12 @@ pub fn normalize(text: &str, whitespace_number: bool) -> PyResult<String> {
     text = MULTIPLE_TABS_RE.replace_all(&text, "\t").into_owned();
     text = MULTIPLE_NEWLINES_RE.replace_all(&text, "\n").into_owned();
 
-    for (pattern, replacement) in &NORMALIZE_RULE2 {
-        let pattern = pattern.replace("t", "[่้๊๋]");
-        let re = Regex::new(&pattern).unwrap();
+    for (re, replacement) in NORMALIZE_RULE2_COMPILED.iter() {
         text = re.replace_all(&text, *replacement).into_owned();
     }
 
-    for &rule in &NORMALIZE_RULE1 {
-        let pattern = format!("{}+", rule.replace("t", "[่้๊๋]"));
-        let re = Regex::new(&pattern).unwrap();
-        text = re.replace_all(&text, rule).into_owned();
+    for (re, rule) in NORMALIZE_RULE1_COMPILED.iter() {
+        text = re.replace_all(&text, *rule).into_owned();
     }
 
     Ok(text)
@@ -95,7 +108,11 @@ fn newmm(text: &str, dict_name: &str, safe: bool, parallel: bool) -> PyResult<Ve
     //
     // Returns:
     //     List[str]: List of tokens
-    if let Some(loaded_dict) = DICT_COLLECTION.read().unwrap().get(dict_name) {
+    let dict_collection = DICT_COLLECTION.read().map_err(|e| {
+        exceptions::PyRuntimeError::new_err(format!("Failed to acquire dictionary lock: {}", e))
+    })?;
+
+    if let Some(loaded_dict) = dict_collection.get(dict_name) {
         let result = loaded_dict.segment_to_string(text, safe, parallel);
         Ok(result)
     } else {
@@ -121,7 +138,10 @@ fn load_dict(file_path: &str, dict_name: &str) -> PyResult<(String, bool)> {
     //
     // Returns:
     //     Tuple[str, bool]: A tuple containing a human-readable result string and a boolean
-    let mut dict_col_lock = DICT_COLLECTION.write().unwrap();
+    let mut dict_col_lock = DICT_COLLECTION.write().map_err(|e| {
+        exceptions::PyRuntimeError::new_err(format!("Failed to acquire dictionary lock: {}", e))
+    })?;
+
     if dict_col_lock.get(dict_name).is_some() {
         Ok((
             format!(
@@ -132,7 +152,7 @@ fn load_dict(file_path: &str, dict_name: &str) -> PyResult<(String, bool)> {
         ))
     } else {
         let tokenizer = NewmmTokenizer::new(file_path);
-        dict_col_lock.insert(dict_name.to_owned(), Box::new(tokenizer));
+        dict_col_lock.insert(dict_name.to_owned(), tokenizer);
 
         Ok((
             format!(

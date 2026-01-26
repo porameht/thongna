@@ -1,6 +1,6 @@
-use crate::bytes_str::custom_string::CustomString;
+use crate::encoding::fixed_width::CustomString;
 
-use super::trie_char::TrieChar as Trie;
+use super::trie::TrieChar as Trie;
 use std::io::{BufRead, BufReader};
 use std::{error::Error, fs::File, path::PathBuf};
 
@@ -16,7 +16,7 @@ pub fn create_dict_trie(source: DictSource) -> Result<Trie, Box<dyn Error>> {
             let reader = BufReader::with_capacity(8192, file);
             let dict: Vec<CustomString> = reader
                 .lines()
-                .filter_map(Result::ok)
+                .map_while(Result::ok)
                 .map(|line| CustomString::new(&line))
                 .collect();
             Ok(Trie::new(&dict))

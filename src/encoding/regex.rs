@@ -14,6 +14,7 @@ trait ToCustomStringRepr {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // Variants reserved for future regex feature support
 enum UnsupportedCustomRegexParserError {
     ByteLiteral,
     ByteClass,
@@ -43,10 +44,15 @@ impl Display for UnsupportedCustomRegexParserError {
                     a, b
                 )
             }
-            UnsupportedCustomRegexParserError::RepetitionRange => todo!(),
-            UnsupportedCustomRegexParserError::ByteLiteral => todo!(),
-            UnsupportedCustomRegexParserError::AnchorStartLine => todo!(),
-            UnsupportedCustomRegexParserError::AnchorEndLine => todo!(),
+            UnsupportedCustomRegexParserError::RepetitionRange => {
+                write!(f, "Repetition range is not supported")
+            }
+            UnsupportedCustomRegexParserError::AnchorStartLine => {
+                write!(f, "Start line anchor (^) is not supported in multiline mode")
+            }
+            UnsupportedCustomRegexParserError::AnchorEndLine => {
+                write!(f, "End line anchor ($) is not supported in multiline mode")
+            }
         }
     }
 }
@@ -88,7 +94,7 @@ impl ToCustomStringRepr for LiteralEnum {
     fn to_custom_byte_repr(&self) -> Result<String> {
         match self {
             LiteralEnum::Unicode(a) => Ok(a.to_four_byte_string()),
-            LiteralEnum::Byte(b) => Err(AnyError::new(
+            LiteralEnum::Byte(_) => Err(AnyError::new(
                 UnsupportedCustomRegexParserError::ByteLiteral,
             )),
         }
@@ -292,10 +298,6 @@ fn char_class(character: char) -> UTFBytesLength {
         [_a, _b, _c, 0] => UTFBytesLength::Three,
         _ => UTFBytesLength::Four,
     }
-}
-
-fn is_in_range<T: PartialEq + PartialOrd>(value: T, range: (T, T)) -> bool {
-    value >= range.0 && value <= range.1
 }
 
 trait PadLeftZeroFourBytesRep {
