@@ -22,6 +22,7 @@ use once_cell::sync::Lazy;
 
 pub mod dictionary;
 pub mod error;
+pub mod search;
 pub mod segmentation;
 pub mod text;
 
