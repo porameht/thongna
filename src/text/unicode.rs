@@ -1,5 +1,8 @@
-/// Functions dealing with a custom four-byte string.
-/// For more details, see src/NOTE_ON_STRING.md
+//! Fixed-width Unicode string handling for efficient Thai text processing.
+//!
+//! This module provides a custom 4-byte per character representation that enables
+//! efficient byte-level operations on Thai text while maintaining Unicode correctness.
+
 use std::{
     error::{self, Error},
     fmt::Display,
@@ -26,67 +29,67 @@ const SPACE_BYTE: &[u8] = &[0, 0, 0, 32];
 
 type PreparedCustomBytes = (Option<u8>, Option<u8>, Option<u8>, Option<u8>);
 
-pub type CustomStringBytesVec = Vec<u8>;
-pub type CustomStringBytesSlice = [u8];
+pub type FixedWidthBytesVec = Vec<u8>;
+pub type FixedWidthBytesSlice = [u8];
 
 fn is_in_range<T: PartialEq + PartialOrd>(value: T, range: (T, T)) -> bool {
     value >= range.0 && value <= range.1
 }
 
 #[derive(Debug, Clone)]
-enum InvalidCustomStringErrorType {
+enum InvalidFixedWidthStringErrorType {
     InvalidLength(usize),
     InvalidFormat,
 }
 
 #[derive(Debug, Clone)]
-struct InvalidCustomStringByteError {
-    error_type: InvalidCustomStringErrorType,
+struct InvalidFixedWidthStringByteError {
+    error_type: InvalidFixedWidthStringErrorType,
     invalid_sequence: Option<Vec<u8>>,
 }
 
-impl Display for InvalidCustomStringByteError {
+impl Display for InvalidFixedWidthStringByteError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self.error_type {
-            InvalidCustomStringErrorType::InvalidFormat => {
+            InvalidFixedWidthStringErrorType::InvalidFormat => {
                 write!(
                     f,
                     "Invalid custom bytes: {:?}",
                     self.invalid_sequence.as_ref().unwrap()
                 )
             }
-            InvalidCustomStringErrorType::InvalidLength(length) => {
+            InvalidFixedWidthStringErrorType::InvalidLength(length) => {
                 write!(f, "Invalid bytes length: {}", length)
             }
         }
     }
 }
 
-impl InvalidCustomStringByteError {
+impl InvalidFixedWidthStringByteError {
     pub fn new_invalid_length(invalid_data: &[u8]) -> Self {
         Self {
-            error_type: InvalidCustomStringErrorType::InvalidLength(invalid_data.len()),
+            error_type: InvalidFixedWidthStringErrorType::InvalidLength(invalid_data.len()),
             invalid_sequence: None,
         }
     }
 
     pub fn new_invalid_format(invalid_data: &[u8]) -> Self {
         Self {
-            error_type: InvalidCustomStringErrorType::InvalidFormat,
+            error_type: InvalidFixedWidthStringErrorType::InvalidFormat,
             invalid_sequence: Some(invalid_data.into()),
         }
     }
 }
 
-impl Error for InvalidCustomStringByteError {}
+impl Error for InvalidFixedWidthStringByteError {}
 
 pub trait FixedCharsLengthByteSlice {
     fn slice_by_char_indice(&self, start: usize, end: usize) -> Self;
     fn chars_len(&self) -> usize;
-    fn is_valid_custom_str_bytes(&self) -> bool;
+    fn is_valid_fixed_width_bytes(&self) -> bool;
 }
 
-impl FixedCharsLengthByteSlice for &CustomStringBytesSlice {
+impl FixedCharsLengthByteSlice for &FixedWidthBytesSlice {
     fn slice_by_char_indice(&self, start: usize, end: usize) -> Self {
         self.get((start * BYTES_PER_CHAR)..(end * BYTES_PER_CHAR))
             .unwrap()
@@ -96,7 +99,7 @@ impl FixedCharsLengthByteSlice for &CustomStringBytesSlice {
         self.len() / BYTES_PER_CHAR
     }
 
-    fn is_valid_custom_str_bytes(&self) -> bool {
+    fn is_valid_fixed_width_bytes(&self) -> bool {
         if !self.len().is_multiple_of(4) {
             return false;
         }
@@ -127,11 +130,13 @@ impl FixedCharsLengthByteSlice for &CustomStringBytesSlice {
 }
 
 /// Returns character index
-pub fn rfind_space_char_index(custom_text: &CustomStringBytesSlice) -> Option<usize> {
-    assert_eq!(custom_text.len() % 4, 0);
+pub fn rfind_space_char_index(fixed_width_text: &FixedWidthBytesSlice) -> Option<usize> {
+    assert_eq!(fixed_width_text.len() % 4, 0);
 
-    for index in (0..(custom_text.len() / BYTES_PER_CHAR)).rev() {
-        if let SPACE_BYTE = &custom_text[(index) * BYTES_PER_CHAR..(index + 1) * BYTES_PER_CHAR] {
+    for index in (0..(fixed_width_text.len() / BYTES_PER_CHAR)).rev() {
+        if let SPACE_BYTE =
+            &fixed_width_text[(index) * BYTES_PER_CHAR..(index + 1) * BYTES_PER_CHAR]
+        {
             return Some(index);
         }
     }
@@ -139,9 +144,9 @@ pub fn rfind_space_char_index(custom_text: &CustomStringBytesSlice) -> Option<us
 }
 
 /// Check if a white space (including left-to-right and right-to-left marks)
-fn is_whitespace(custom_bytes: &CustomStringBytesSlice) -> bool {
+fn is_whitespace(fixed_width_bytes: &FixedWidthBytesSlice) -> bool {
     matches!(
-        custom_bytes,
+        fixed_width_bytes,
         [0, 0, 0, 9] // Character tabulation (HT) (\t) U+0009
             | [0, 0, 0, 10] // Line feed (LF) (\n) U+000A
             | [0, 0, 0, 11] // Line tabulation (VT) U+000B
@@ -178,22 +183,19 @@ fn is_whitespace(custom_bytes: &CustomStringBytesSlice) -> bool {
     )
 }
 
-fn to_four_bytes(input: &str) -> CustomStringBytesVec {
+fn to_four_bytes(input: &str) -> FixedWidthBytesVec {
     let output_size = num_chars(input.as_bytes());
     let mut output_vec: Vec<u8> = Vec::with_capacity(output_size * 2);
-    // let mut output:&[u8;4] = &[0;output_size];
     for character in input.chars() {
         let mut bytes_buffer: [u8; 4] = [0; 4];
 
         character.encode_utf8(&mut bytes_buffer);
-        // not leading zero yet
         let arranged_buffer = match bytes_buffer {
             [a, 0, 0, 0] => [0, 0, 0, a],
             [a, b, 0, 0] => [0, 0, a, b],
             [a, b, c, 0] => [0, a, b, c],
             _ => bytes_buffer,
         };
-        // let vec_of_bytes = Vec::with_capacity(4);
 
         output_vec.extend_from_slice(&arranged_buffer);
     }
@@ -201,10 +203,10 @@ fn to_four_bytes(input: &str) -> CustomStringBytesVec {
 }
 
 fn trim_to_std_utf8(
-    input: &CustomStringBytesSlice,
+    input: &FixedWidthBytesSlice,
 ) -> Result<PreparedCustomBytes, Box<dyn error::Error>> {
     if !input.len().is_multiple_of(4) {
-        Err(InvalidCustomStringByteError::new_invalid_length(input).into())
+        Err(InvalidFixedWidthStringByteError::new_invalid_length(input).into())
     } else {
         match input {
             [0, 0, 0, one_byte_char]
@@ -243,21 +245,23 @@ fn trim_to_std_utf8(
                     Some(*fourth_byte),
                 ))
             }
-            _ => Err(InvalidCustomStringByteError::new_invalid_format(input).into()),
+            _ => Err(InvalidFixedWidthStringByteError::new_invalid_format(input).into()),
         }
     }
 }
 
-/// This name is WIP
-pub trait FixedLengthCustomString<T: Sized + FixedLengthCustomString<T>> {
+/// Trait for fixed-length string operations
+pub trait FixedLengthString<T: Sized + FixedLengthString<T>> {
     /// start and end are character index.
     fn substring(&self, start: usize, end: usize) -> T;
     fn get_original_string(&self) -> &[u8];
 }
 
+/// A fixed-width Unicode string representation.
+///
 /// The content inside this string is a vector of bytes,
 /// ALWAYS with length % 4 == 0
-///     
+///
 /// Every character is a valid utf-8 encoded byte padded left with 0
 /// to make every character takes 4 bytes.
 ///
@@ -269,12 +273,12 @@ pub trait FixedLengthCustomString<T: Sized + FixedLengthCustomString<T>> {
 /// String "กข " is represented by
 /// \[224, 184, 129, 224, 184, 130, 32\]
 ///
-/// CustomString "กข " is represented by
+/// FixedWidthString "กข " is represented by
 /// \[0, 224, 184, 129, 0, 224, 184, 130, 0, 0, 0, 32\]
 #[derive(Clone, Debug)]
-pub struct CustomString {
+pub struct FixedWidthString {
     /// full content
-    content: Arc<CustomStringBytesVec>,
+    content: Arc<FixedWidthBytesVec>,
     /// full char unicode scalar value contents, corresponding to the full content
     chars_content: Arc<Vec<char>>,
     /// char index
@@ -283,7 +287,7 @@ pub struct CustomString {
     end: usize,
 }
 
-impl CustomString {
+impl FixedWidthString {
     pub fn new(base_string: &str) -> Self {
         let content = to_four_bytes(base_string);
         let chars_content = Arc::new(base_string.chars().collect::<Vec<char>>());
@@ -372,8 +376,6 @@ impl CustomString {
     /// Converts fixed-width 4-byte representation back to standard UTF-8 bytes.
     /// Capacity is estimated at 3/4 of input (most Thai chars are 3 bytes).
     pub fn convert_raw_bytes_to_utf8_bytes(input: &[u8]) -> Vec<u8> {
-        // Estimate capacity: Thai chars are typically 3 bytes, ASCII is 1 byte
-        // Using 3/4 of input length as a reasonable estimate
         let mut output_content: Vec<u8> = Vec::with_capacity(input.len() * 3 / 4);
         for index in 0..input.chars_len() {
             let extracted_bytes =
@@ -407,7 +409,7 @@ impl CustomString {
         unsafe { String::from_utf8_unchecked(bytes) }
     }
 
-    /// The result substring contains an atomic RC to the same full Vec<u8> as the caller's content.  
+    /// The result substring contains an atomic RC to the same full Vec<u8> as the caller's content.
     pub fn substring(&self, start: usize, end: usize) -> Self {
         let new_start = self.start + start;
         let new_end = self.start + end;
@@ -449,16 +451,19 @@ fn test_bytes() {
         "ท้องที่ดังกล่าวเรียกรวมกันว่า \"พื้นที่ไต้หวัน\" (臺灣地區)\n",
     ]
     .join("");
-    let custom_string = CustomString::new(&text);
-    assert_eq!(custom_string.full_string_bytes_len() % 4, 0);
+    let fixed_string = FixedWidthString::new(&text);
+    assert_eq!(fixed_string.full_string_bytes_len() % 4, 0);
 }
 
 #[test]
 fn test_trim() {
-    assert!(CustomString::new(" ").trim().is_empty());
-    assert!(CustomString::new("  ").trim().is_empty());
-    assert!(CustomString::new("\n").trim().is_empty());
-    assert!(CustomString::new("  \t\n ").trim().is_empty());
-    assert_eq!(CustomString::new(" abc ").trim().chars_len(), 3);
-    assert_eq!(CustomString::new(" aก  ").trim().full_string_bytes_len(), 8); // 2 chars * 4 bytes
+    assert!(FixedWidthString::new(" ").trim().is_empty());
+    assert!(FixedWidthString::new("  ").trim().is_empty());
+    assert!(FixedWidthString::new("\n").trim().is_empty());
+    assert!(FixedWidthString::new("  \t\n ").trim().is_empty());
+    assert_eq!(FixedWidthString::new(" abc ").trim().chars_len(), 3);
+    assert_eq!(
+        FixedWidthString::new(" aก  ").trim().full_string_bytes_len(),
+        8
+    ); // 2 chars * 4 bytes
 }

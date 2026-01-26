@@ -1,10 +1,8 @@
-# Thongna
+# thainlp-rs
 
-A high-performance Thai text processing library built with Rust.
+Thai NLP library built with Rust.
 
-## Features
-
-- Thai word segmentation (NewMM algorithm)
+- Word segmentation (NewMM algorithm)
 - Text normalization
 - Custom dictionary support
 - Parallel processing
@@ -13,23 +11,24 @@ A high-performance Thai text processing library built with Rust.
 
 ```toml
 [dependencies]
-thongna = "0.2.4"
+thainlp-rs = "0.3.0"
 ```
 
 ## Usage
 
 ```rust
-use thongna::{word_tokenize, normalize};
+use thainlp_rs::{load_dict, segment, normalize};
 
-fn main() {
-    // Word segmentation
-    let tokens = word_tokenize("สวัสดีครับ");
-    println!("{:?}", tokens);
+// Load dictionary
+load_dict("data/dictionaries/default.txt", "default").unwrap();
 
-    // Text normalization
-    let text = normalize("เเปลก");
-    println!("{}", text);
-}
+// Word segmentation
+let tokens = segment("สวัสดีครับ", "default", false, false).unwrap();
+// ["สวัสดี", "ครับ"]
+
+// Text normalization
+let text = normalize("เเปลก", true);
+// "แปลก"
 ```
 
 ## License

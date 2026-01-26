@@ -1,23 +1,19 @@
 [package]
-name = "thongna"
-version = "0.2.4"
+name = "thainlp-rs"
+version = "0.3.0"
 edition = "2021"
 license = "Apache-2.0"
 authors = ["Porameht Khumsombat"]
-description = "Blazing-fast Thai text processing library powered by Rust"
-repository = "https://github.com/porameht/thongna"
+description = "High-performance Thai NLP library - word segmentation, text normalization, and more"
+repository = "https://github.com/porameht/thainlp-rs"
 readme = "README.md"
 keywords = ["thai", "tokenizer", "nlp", "word-segmentation"]
 categories = ["text-processing", "internationalization"]
-exclude = [
-    "notebooks",
-    "tests",
-    ".github",
-    ".gitignore",
-]
+exclude = [".github", ".gitignore"]
+include = ["src/**/*", "data/**/*", "Cargo.toml", "README.md", "LICENSE"]
 
 [lib]
-name = "thongna"
+name = "thainlp_rs"
 
 [dependencies]
 regex = "1"

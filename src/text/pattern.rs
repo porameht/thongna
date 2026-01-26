@@ -1,6 +1,7 @@
-// This is a result of an attempt to create a formatter
-// which translates normal, human readable thai regex
-// into 4-bytes zero-left-pad bytes regex pattern string
+//! Regex pattern conversion for fixed-width Unicode strings.
+//!
+//! This module translates normal, human-readable Thai regex patterns
+//! into 4-byte zero-left-padded byte regex pattern strings.
 
 use anyhow::{Error as AnyError, Result};
 use regex_syntax::{
@@ -9,13 +10,14 @@ use regex_syntax::{
     is_meta_character, Parser,
 };
 use std::{error::Error, fmt::Display};
-trait ToCustomStringRepr {
-    fn to_custom_byte_repr(&self) -> Result<String>;
+
+trait ToFixedWidthRepr {
+    fn to_fixed_width_repr(&self) -> Result<String>;
 }
 
 #[derive(Debug, Clone)]
 #[allow(dead_code)] // Variants reserved for future regex feature support
-enum UnsupportedCustomRegexParserError {
+enum UnsupportedPatternError {
     ByteLiteral,
     ByteClass,
     DifferentRanges(char, char),
@@ -23,68 +25,71 @@ enum UnsupportedCustomRegexParserError {
     AnchorStartLine,
     AnchorEndLine,
 }
+
 enum IterableHirKind {
     Alternation(Vec<Hir>),
     Concat(Vec<Hir>),
 }
 
-impl Display for UnsupportedCustomRegexParserError {
+impl Display for UnsupportedPatternError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::ByteLiteral => {
                 write!(f, "Byte literal is not supported")
             }
-            UnsupportedCustomRegexParserError::ByteClass => {
+            UnsupportedPatternError::ByteClass => {
                 write!(f, "Byte class is not supported")
             }
-            UnsupportedCustomRegexParserError::DifferentRanges(a, b) => {
+            UnsupportedPatternError::DifferentRanges(a, b) => {
                 write!(
                     f,
                     "Different byte length range is not supported {} {}",
                     a, b
                 )
             }
-            UnsupportedCustomRegexParserError::RepetitionRange => {
+            UnsupportedPatternError::RepetitionRange => {
                 write!(f, "Repetition range is not supported")
             }
-            UnsupportedCustomRegexParserError::AnchorStartLine => {
+            UnsupportedPatternError::AnchorStartLine => {
                 write!(
                     f,
                     "Start line anchor (^) is not supported in multiline mode"
                 )
             }
-            UnsupportedCustomRegexParserError::AnchorEndLine => {
+            UnsupportedPatternError::AnchorEndLine => {
                 write!(f, "End line anchor ($) is not supported in multiline mode")
             }
         }
     }
 }
-impl Error for UnsupportedCustomRegexParserError {}
+impl Error for UnsupportedPatternError {}
 
-impl ToCustomStringRepr for Hir {
-    fn to_custom_byte_repr(&self) -> Result<String> {
-        self.kind().to_custom_byte_repr()
+impl ToFixedWidthRepr for Hir {
+    fn to_fixed_width_repr(&self) -> Result<String> {
+        self.kind().to_fixed_width_repr()
     }
 }
-impl ToCustomStringRepr for HirKind {
-    fn to_custom_byte_repr(&self) -> Result<String> {
+
+impl ToFixedWidthRepr for HirKind {
+    fn to_fixed_width_repr(&self) -> Result<String> {
         match self {
             HirKind::Empty => todo!(),
-            HirKind::Literal(l) => l.to_custom_byte_repr(),
-            HirKind::Class(c) => c.to_custom_byte_repr(),
-            HirKind::Anchor(a) => a.to_custom_byte_repr(),
+            HirKind::Literal(l) => l.to_fixed_width_repr(),
+            HirKind::Class(c) => c.to_fixed_width_repr(),
+            HirKind::Anchor(a) => a.to_fixed_width_repr(),
             HirKind::WordBoundary(_) => todo!(),
-            HirKind::Repetition(r) => r.to_custom_byte_repr(),
-            HirKind::Group(g) => g.to_custom_byte_repr(),
-            HirKind::Concat(c) => IterableHirKind::Concat(c.to_vec()).to_custom_byte_repr(),
+            HirKind::Repetition(r) => r.to_fixed_width_repr(),
+            HirKind::Group(g) => g.to_fixed_width_repr(),
+            HirKind::Concat(c) => IterableHirKind::Concat(c.to_vec()).to_fixed_width_repr(),
             HirKind::Alternation(a) => {
-                IterableHirKind::Alternation(a.to_vec()).to_custom_byte_repr()
+                IterableHirKind::Alternation(a.to_vec()).to_fixed_width_repr()
             }
         }
     }
 }
-impl ToCustomStringRepr for Anchor {
-    fn to_custom_byte_repr(&self) -> Result<String> {
+
+impl ToFixedWidthRepr for Anchor {
+    fn to_fixed_width_repr(&self) -> Result<String> {
         match self {
             Anchor::StartLine => todo!(),
             Anchor::EndLine => todo!(),
@@ -93,26 +98,29 @@ impl ToCustomStringRepr for Anchor {
         }
     }
 }
-impl ToCustomStringRepr for LiteralEnum {
-    fn to_custom_byte_repr(&self) -> Result<String> {
+
+impl ToFixedWidthRepr for LiteralEnum {
+    fn to_fixed_width_repr(&self) -> Result<String> {
         match self {
             LiteralEnum::Unicode(a) => Ok(a.to_four_byte_string()),
-            LiteralEnum::Byte(_) => Err(AnyError::new(
-                UnsupportedCustomRegexParserError::ByteLiteral,
-            )),
+            LiteralEnum::Byte(_) => {
+                Err(AnyError::new(UnsupportedPatternError::ByteLiteral))
+            }
         }
     }
 }
-impl ToCustomStringRepr for Class {
-    fn to_custom_byte_repr(&self) -> Result<String> {
+
+impl ToFixedWidthRepr for Class {
+    fn to_fixed_width_repr(&self) -> Result<String> {
         match self {
             Class::Unicode(u) => Ok(u.ranges().to_four_byte_string()),
-            Class::Bytes(_) => Err(AnyError::from(UnsupportedCustomRegexParserError::ByteClass)),
+            Class::Bytes(_) => Err(AnyError::from(UnsupportedPatternError::ByteClass)),
         }
     }
 }
-impl ToCustomStringRepr for Repetition {
-    fn to_custom_byte_repr(&self) -> Result<String> {
+
+impl ToFixedWidthRepr for Repetition {
+    fn to_fixed_width_repr(&self) -> Result<String> {
         let symbol: Result<String> = match &self.kind {
             regex_syntax::hir::RepetitionKind::ZeroOrOne => Ok("?".to_string()),
             regex_syntax::hir::RepetitionKind::ZeroOrMore => Ok("*".to_string()),
@@ -128,15 +136,15 @@ impl ToCustomStringRepr for Repetition {
 
         let repeated_expression = match &self.hir.kind() {
             HirKind::Empty => todo!(),
-            HirKind::Literal(l) => l.to_custom_byte_repr(),
-            HirKind::Class(c) => c.to_custom_byte_repr(),
-            HirKind::Anchor(a) => a.to_custom_byte_repr(),
+            HirKind::Literal(l) => l.to_fixed_width_repr(),
+            HirKind::Class(c) => c.to_fixed_width_repr(),
+            HirKind::Anchor(a) => a.to_fixed_width_repr(),
             HirKind::WordBoundary(_) => todo!(),
-            HirKind::Repetition(r) => r.to_custom_byte_repr(),
-            HirKind::Group(g) => g.to_custom_byte_repr(),
-            HirKind::Concat(c) => IterableHirKind::Concat(c.to_vec()).to_custom_byte_repr(),
+            HirKind::Repetition(r) => r.to_fixed_width_repr(),
+            HirKind::Group(g) => g.to_fixed_width_repr(),
+            HirKind::Concat(c) => IterableHirKind::Concat(c.to_vec()).to_fixed_width_repr(),
             HirKind::Alternation(a) => {
-                IterableHirKind::Alternation(a.to_vec()).to_custom_byte_repr()
+                IterableHirKind::Alternation(a.to_vec()).to_fixed_width_repr()
             }
         };
         if let HirKind::Group(_) = &self.hir.kind() {
@@ -146,8 +154,9 @@ impl ToCustomStringRepr for Repetition {
         }
     }
 }
-impl ToCustomStringRepr for IterableHirKind {
-    fn to_custom_byte_repr(&self) -> Result<String> {
+
+impl ToFixedWidthRepr for IterableHirKind {
+    fn to_fixed_width_repr(&self) -> Result<String> {
         match self {
             IterableHirKind::Alternation(a) => {
                 let mut cus_str = String::new();
@@ -158,27 +167,27 @@ impl ToCustomStringRepr for IterableHirKind {
                             if !cus_str.is_empty() {
                                 cus_str = cus_str
                                     + "|"
-                                    + format!("({})", &literal.to_custom_byte_repr()?).as_str();
+                                    + format!("({})", &literal.to_fixed_width_repr()?).as_str();
                             } else {
-                                cus_str = format!("({})", &literal.to_custom_byte_repr()?);
+                                cus_str = format!("({})", &literal.to_fixed_width_repr()?);
                             }
                         }
                         HirKind::Class(c) => {
                             if !cus_str.is_empty() {
                                 cus_str = cus_str
                                     + "|"
-                                    + format!("({})", &c.to_custom_byte_repr()?).as_str();
+                                    + format!("({})", &c.to_fixed_width_repr()?).as_str();
                             } else {
-                                cus_str = format!("({})", &c.to_custom_byte_repr()?);
+                                cus_str = format!("({})", &c.to_fixed_width_repr()?);
                             }
                         }
                         HirKind::Anchor(a) => {
                             if !cus_str.is_empty() {
                                 cus_str = cus_str
                                     + "|"
-                                    + format!("({})", &a.to_custom_byte_repr()?).as_str();
+                                    + format!("({})", &a.to_fixed_width_repr()?).as_str();
                             } else {
-                                cus_str = format!("({})", &a.to_custom_byte_repr()?);
+                                cus_str = format!("({})", &a.to_fixed_width_repr()?);
                             }
                         }
                         HirKind::WordBoundary(_) => todo!(),
@@ -186,18 +195,18 @@ impl ToCustomStringRepr for IterableHirKind {
                             if !cus_str.is_empty() {
                                 cus_str = cus_str
                                     + "|"
-                                    + format!("({})", &r.to_custom_byte_repr()?).as_str();
+                                    + format!("({})", &r.to_fixed_width_repr()?).as_str();
                             } else {
-                                cus_str = format!("({})", &r.to_custom_byte_repr()?);
+                                cus_str = format!("({})", &r.to_fixed_width_repr()?);
                             }
                         }
                         HirKind::Group(g) => {
                             if !cus_str.is_empty() {
                                 cus_str = cus_str
                                     + "|"
-                                    + format!("({})", &g.to_custom_byte_repr()?).as_str();
+                                    + format!("({})", &g.to_fixed_width_repr()?).as_str();
                             } else {
-                                cus_str = format!("({})", &g.to_custom_byte_repr()?);
+                                cus_str = format!("({})", &g.to_fixed_width_repr()?);
                             }
                         }
                         HirKind::Concat(concat) => {
@@ -207,18 +216,18 @@ impl ToCustomStringRepr for IterableHirKind {
                                     + format!(
                                         "({})",
                                         (&IterableHirKind::Concat(concat.to_vec())
-                                            .to_custom_byte_repr()?)
+                                            .to_fixed_width_repr()?)
                                     )
                                     .as_str();
                             } else {
                                 cus_str = IterableHirKind::Concat(concat.to_vec())
-                                    .to_custom_byte_repr()?;
+                                    .to_fixed_width_repr()?;
                             }
                         }
                         HirKind::Alternation(alternation) => {
                             cus_str = cus_str
                                 + &IterableHirKind::Alternation(alternation.to_vec())
-                                    .to_custom_byte_repr()?;
+                                    .to_fixed_width_repr()?;
                         }
                     }
                 }
@@ -230,22 +239,21 @@ impl ToCustomStringRepr for IterableHirKind {
                     match member.kind() {
                         HirKind::Empty => todo!(),
                         HirKind::Literal(literal) => {
-                            cus_str = cus_str + &literal.to_custom_byte_repr()?;
+                            cus_str = cus_str + &literal.to_fixed_width_repr()?;
                         }
-                        HirKind::Class(c) => cus_str = cus_str + &c.to_custom_byte_repr()?,
-                        HirKind::Anchor(a) => cus_str = cus_str + &a.to_custom_byte_repr()?,
+                        HirKind::Class(c) => cus_str = cus_str + &c.to_fixed_width_repr()?,
+                        HirKind::Anchor(a) => cus_str = cus_str + &a.to_fixed_width_repr()?,
                         HirKind::WordBoundary(_) => todo!(),
-                        HirKind::Repetition(r) => cus_str = cus_str + &r.to_custom_byte_repr()?,
-                        HirKind::Group(g) => cus_str = cus_str + &g.to_custom_byte_repr()?,
+                        HirKind::Repetition(r) => cus_str = cus_str + &r.to_fixed_width_repr()?,
+                        HirKind::Group(g) => cus_str = cus_str + &g.to_fixed_width_repr()?,
                         HirKind::Concat(concat) => {
                             cus_str = cus_str
-                                + &IterableHirKind::Concat(concat.to_vec())
-                                    .to_custom_byte_repr()?;
+                                + &IterableHirKind::Concat(concat.to_vec()).to_fixed_width_repr()?;
                         }
                         HirKind::Alternation(alternation) => {
                             cus_str = cus_str
                                 + &(IterableHirKind::Alternation(alternation.to_vec())
-                                    .to_custom_byte_repr()?);
+                                    .to_fixed_width_repr()?);
                         }
                     }
                 }
@@ -254,19 +262,20 @@ impl ToCustomStringRepr for IterableHirKind {
         }
     }
 }
-impl ToCustomStringRepr for Group {
-    fn to_custom_byte_repr(&self) -> Result<String> {
+
+impl ToFixedWidthRepr for Group {
+    fn to_fixed_width_repr(&self) -> Result<String> {
         let recur = match self.hir.kind() {
             HirKind::Empty => todo!(),
-            HirKind::Literal(lit) => lit.to_custom_byte_repr(),
-            HirKind::Class(c) => c.to_custom_byte_repr(),
-            HirKind::Anchor(a) => a.to_custom_byte_repr(),
+            HirKind::Literal(lit) => lit.to_fixed_width_repr(),
+            HirKind::Class(c) => c.to_fixed_width_repr(),
+            HirKind::Anchor(a) => a.to_fixed_width_repr(),
             HirKind::WordBoundary(_) => todo!(),
             HirKind::Repetition(_) => todo!(),
-            HirKind::Group(g) => g.to_custom_byte_repr(),
-            HirKind::Concat(c) => IterableHirKind::Concat(c.to_vec()).to_custom_byte_repr(),
+            HirKind::Group(g) => g.to_fixed_width_repr(),
+            HirKind::Concat(c) => IterableHirKind::Concat(c.to_vec()).to_fixed_width_repr(),
             HirKind::Alternation(a) => {
-                IterableHirKind::Alternation(a.to_vec()).to_custom_byte_repr()
+                IterableHirKind::Alternation(a.to_vec()).to_fixed_width_repr()
             }
         };
         Ok("(".to_owned() + &recur? + ")")
@@ -274,7 +283,6 @@ impl ToCustomStringRepr for Group {
 }
 
 fn get_char_range_byte_class(class_range: &ClassUnicodeRange) -> Option<UTFBytesLength> {
-    // currently allow only the same byte length
     let start_class = char_class(class_range.start());
     let end_class = char_class(class_range.end());
     if start_class == end_class {
@@ -291,6 +299,7 @@ enum UTFBytesLength {
     Three,
     Four,
 }
+
 fn char_class(character: char) -> UTFBytesLength {
     let mut bytes_buffer: [u8; 4] = [0; 4];
 
@@ -306,6 +315,7 @@ fn char_class(character: char) -> UTFBytesLength {
 trait PadLeftZeroFourBytesRep {
     fn to_four_byte_string(&self) -> String;
 }
+
 fn escape_meta_character(c: char) -> String {
     if is_meta_character(c) {
         format!(r"\{}", c)
@@ -315,6 +325,7 @@ fn escape_meta_character(c: char) -> String {
         c.to_string()
     }
 }
+
 impl PadLeftZeroFourBytesRep for &[ClassUnicodeRange] {
     fn to_four_byte_string(&self) -> String {
         let urange = self;
@@ -324,7 +335,6 @@ impl PadLeftZeroFourBytesRep for &[ClassUnicodeRange] {
             .collect::<Vec<_>>();
 
         if char_classes.iter().all(|elem| elem.is_some()) {
-            // must be the same class for every range pair!
             let the_class = char_classes.first().unwrap().unwrap();
 
             if char_classes.iter().all(|elem| elem.unwrap() == the_class) {
@@ -335,7 +345,6 @@ impl PadLeftZeroFourBytesRep for &[ClassUnicodeRange] {
                     UTFBytesLength::Four => r"",
                 };
                 let mut output_four_bytes_rep: Vec<String> = vec![];
-                // we want to create all syntax of \x00\x00\x00[a-z]
                 for regex_range in urange.iter() {
                     let (start, end) = (regex_range.start(), regex_range.end());
                     if start == end {
@@ -362,13 +371,13 @@ impl PadLeftZeroFourBytesRep for &[ClassUnicodeRange] {
         }
     }
 }
+
 impl PadLeftZeroFourBytesRep for char {
     fn to_four_byte_string(&self) -> String {
         let character = self;
 
         let mut bytes_buffer: [u8; 4] = [0; 4];
         character.encode_utf8(&mut bytes_buffer);
-        // not leading zero yet
         let result = match bytes_buffer {
             [_a, 0, 0, 0] => {
                 if character.is_alphanumeric() || (character.is_whitespace() && *character == ' ') {
@@ -389,7 +398,8 @@ impl PadLeftZeroFourBytesRep for char {
     }
 }
 
-pub fn regex_pattern_to_custom_pattern(regex_pattern: &str) -> Result<String> {
+/// Converts a standard regex pattern to a fixed-width compatible pattern.
+pub fn to_fixed_width_pattern(regex_pattern: &str) -> Result<String> {
     let hir = Parser::new().parse(regex_pattern)?;
-    hir.to_custom_byte_repr()
+    hir.to_fixed_width_repr()
 }

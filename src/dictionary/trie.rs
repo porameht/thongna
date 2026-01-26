@@ -1,5 +1,10 @@
-use crate::encoding::fixed_width::{
-    CustomString, CustomStringBytesSlice, CustomStringBytesVec, FixedCharsLengthByteSlice,
+//! Trie data structure for dictionary storage.
+//!
+//! This module provides an efficient trie implementation for storing
+//! and querying Thai words in the dictionary.
+
+use crate::text::unicode::{
+    FixedWidthBytesSlice, FixedWidthBytesVec, FixedWidthString, FixedCharsLengthByteSlice,
 };
 
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
@@ -44,8 +49,7 @@ impl TrieNode {
         self.end = false;
     }
 
-    fn add_word(&mut self, input_word: &CustomString) {
-        // thanks to https://stackoverflow.com/questions/36957286/how-do-you-implement-this-simple-trie-node-in-rust
+    fn add_word(&mut self, input_word: &FixedWidthString) {
         if input_word.is_empty() {
             self.end = true;
             return;
@@ -56,14 +60,12 @@ impl TrieNode {
             .add_word(&input_word.substring(1, input_word.chars_len()));
     }
 
-    fn remove_word(&mut self, input_word: &CustomString) {
+    fn remove_word(&mut self, input_word: &FixedWidthString) {
         let mut word = input_word;
         let char_count = word.chars_len();
-        // if has at least 1 char
         if char_count >= 1 {
             let character = word.get_chars_content().first().unwrap();
             if let Some(child) = self.find_mut_child(character) {
-                // move 1 character
                 let substring_of_word = word.substring(1, word.chars_len());
                 if char_count == 1 {
                     child.set_not_end();
@@ -78,16 +80,18 @@ impl TrieNode {
     }
 }
 
-#[derive(Debug)]
-/// This version of Trie still stores custom bytes vector as words,
+/// Character-based Trie for efficient dictionary lookups.
+///
+/// This version of Trie stores fixed-width bytes vector as words,
 /// but prefix operation and its node uses char instead.
-pub struct TrieChar {
-    words: HashSet<CustomStringBytesVec>,
+#[derive(Debug)]
+pub struct DictionaryTrie {
+    words: HashSet<FixedWidthBytesVec>,
     root: TrieNode,
 }
 
-impl TrieChar {
-    pub fn new(words: &[CustomString]) -> Self {
+impl DictionaryTrie {
+    pub fn new(words: &[FixedWidthString]) -> Self {
         let mut instance = Self {
             words: HashSet::default(),
             root: TrieNode::new(),
@@ -99,11 +103,11 @@ impl TrieChar {
     }
 
     #[allow(dead_code)]
-    fn remove_word_from_set(&mut self, word: &CustomString) {
+    fn remove_word_from_set(&mut self, word: &FixedWidthString) {
         self.words.remove(word.raw_content());
     }
 
-    pub fn add(&mut self, word: &CustomString) {
+    pub fn add(&mut self, word: &FixedWidthString) {
         let stripped_word = word.trim();
         if !stripped_word.is_empty() {
             self.words.insert(stripped_word.raw_content().into());
@@ -112,30 +116,39 @@ impl TrieChar {
         }
     }
 
-    pub fn remove(&mut self, word: &CustomString) {
+    pub fn remove(&mut self, word: &FixedWidthString) {
         let stripped_word = word.trim();
         if !stripped_word.is_empty() && self.words.contains(stripped_word.raw_content()) {
             self.remove_word_from_set(&stripped_word);
-            self.root.remove_word(&stripped_word); // remove from node
+            self.root.remove_word(&stripped_word);
         }
     }
+
     #[allow(dead_code)]
-    pub fn contain(&self, word: &CustomString) -> bool {
+    pub fn contains(&self, word: &FixedWidthString) -> bool {
         self.words.contains(word.raw_content())
     }
+
     #[allow(dead_code)]
-    pub fn iterate(&self) -> std::collections::hash_set::Iter<'_, Vec<u8>> {
+    pub fn iter(&self) -> std::collections::hash_set::Iter<'_, Vec<u8>> {
         self.words.iter()
     }
+
     #[allow(dead_code)]
-    pub fn amount_of_words(&self) -> usize {
+    pub fn len(&self) -> usize {
         self.words.len()
     }
+
+    #[allow(dead_code)]
+    pub fn is_empty(&self) -> bool {
+        self.words.is_empty()
+    }
+
     /// Returns a vec of substring (as reference) as produced by words stored in dict_trie.
-    pub fn prefix_ref<'p>(
-        prefix: &'p CustomString,
+    pub fn find_prefixes<'p>(
+        prefix: &'p FixedWidthString,
         dict_trie: &Self,
-    ) -> Vec<&'p CustomStringBytesSlice> {
+    ) -> Vec<&'p FixedWidthBytesSlice> {
         let mut result: Vec<&[u8]> = vec![];
         let prefix_cpy = prefix;
         let mut current_index = 0;
@@ -163,20 +176,20 @@ impl TrieChar {
 
 #[test]
 fn test_add_and_remove_word() {
-    let mut trie = TrieChar::new(&[CustomString::new("ศาล")]);
-    assert_eq!(trie.amount_of_words(), 1);
-    trie.add(&CustomString::new("ศาล"));
-    assert_eq!(trie.amount_of_words(), 1);
-    trie.add(&CustomString::new("  ศาล "));
-    assert_eq!(trie.amount_of_words(), 1);
-    trie.add(&CustomString::new("ศาลา"));
-    assert_eq!(trie.amount_of_words(), 2);
-    trie.remove(&CustomString::new("ศาลา"));
-    assert_eq!(trie.amount_of_words(), 1);
-    trie.remove(&CustomString::new("ลา"));
-    assert_eq!(trie.amount_of_words(), 1);
-    trie.remove(&CustomString::new("ศาล"));
-    assert_eq!(trie.amount_of_words(), 0);
-    trie.remove(&CustomString::new(""));
-    assert_eq!(trie.amount_of_words(), 0);
+    let mut trie = DictionaryTrie::new(&[FixedWidthString::new("ศาล")]);
+    assert_eq!(trie.len(), 1);
+    trie.add(&FixedWidthString::new("ศาล"));
+    assert_eq!(trie.len(), 1);
+    trie.add(&FixedWidthString::new("  ศาล "));
+    assert_eq!(trie.len(), 1);
+    trie.add(&FixedWidthString::new("ศาลา"));
+    assert_eq!(trie.len(), 2);
+    trie.remove(&FixedWidthString::new("ศาลา"));
+    assert_eq!(trie.len(), 1);
+    trie.remove(&FixedWidthString::new("ลา"));
+    assert_eq!(trie.len(), 1);
+    trie.remove(&FixedWidthString::new("ศาล"));
+    assert_eq!(trie.len(), 0);
+    trie.remove(&FixedWidthString::new(""));
+    assert_eq!(trie.len(), 0);
 }

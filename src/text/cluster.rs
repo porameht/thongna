@@ -1,9 +1,17 @@
-use crate::encoding::regex::regex_pattern_to_custom_pattern;
+//! Thai Character Cluster (TCC) detection.
+//!
+//! This module identifies valid Thai character cluster boundaries,
+//! which are used to constrain word segmentation positions.
+
+use super::pattern::to_fixed_width_pattern;
+use super::unicode::{FixedWidthBytesSlice, FixedCharsLengthByteSlice, BYTES_PER_CHAR};
+
 use once_cell::sync::Lazy;
 use regex::bytes::Regex;
+use rustc_hash::FxHashSet as HashSet;
 
 #[inline(always)]
-pub fn replace_tcc_symbol(tcc_pattern: &str) -> String {
+fn replace_tcc_symbol(tcc_pattern: &str) -> String {
     tcc_pattern
         .replace('k', "(cc?[dิ]?[์])?")
         .replace('c', "[ก-ฮ]")
@@ -11,7 +19,7 @@ pub fn replace_tcc_symbol(tcc_pattern: &str) -> String {
         .replace('d', "ูุ")
 }
 
-pub static NON_LOOKAHEAD_TCC: Lazy<Regex> = Lazy::new(|| {
+static NON_LOOKAHEAD_TCC: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
         &[
             r"^เc็ck",
@@ -45,27 +53,86 @@ pub static NON_LOOKAHEAD_TCC: Lazy<Regex> = Lazy::new(|| {
             r"^(เc[ิีุู]tย)[เ-ไก-ฮ]k",
         ]
         .iter()
-        .map(|&pattern| regex_pattern_to_custom_pattern(&replace_tcc_symbol(pattern)).unwrap())
+        .map(|&pattern| to_fixed_width_pattern(&replace_tcc_symbol(pattern)).unwrap())
         .collect::<Vec<_>>()
         .join("|"),
     )
     .unwrap()
 });
 
-pub static LOOKAHEAD_TCC: Lazy<Regex> = Lazy::new(|| {
+static LOOKAHEAD_TCC: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
         &[r"^(เccีtย)[เ-ไก-ฮ]k", r"^(เc[ิีุู]tย)[เ-ไก-ฮ]k"]
             .iter()
-            .map(|&pattern| regex_pattern_to_custom_pattern(&replace_tcc_symbol(pattern)).unwrap())
+            .map(|&pattern| to_fixed_width_pattern(&replace_tcc_symbol(pattern)).unwrap())
             .collect::<Vec<_>>()
             .join("|"),
     )
     .unwrap()
 });
 
+/// Returns a set of character indices at the end of each Thai character cluster.
+#[inline]
+pub fn find_cluster_boundaries(fixed_width_text: &FixedWidthBytesSlice) -> HashSet<usize> {
+    let mut set =
+        HashSet::with_capacity_and_hasher(fixed_width_text.chars_len() / 10, Default::default());
+    let mut txt = fixed_width_text;
+    let mut position: usize = 0;
+
+    while !txt.is_empty() {
+        if let Some(result) = NON_LOOKAHEAD_TCC.find(txt) {
+            let matched = &txt[result.start()..result.end()];
+            let match_length = matched.len();
+
+            if LOOKAHEAD_TCC.is_match(matched) {
+                let end_char_index = (match_length - BYTES_PER_CHAR) / BYTES_PER_CHAR;
+                position += end_char_index;
+                set.insert(position);
+                txt = txt.slice_by_char_indice(end_char_index, txt.chars_len());
+            } else {
+                let segment_size = match_length / BYTES_PER_CHAR;
+                position += segment_size;
+                set.insert(position);
+                txt = txt.slice_by_char_indice(segment_size, txt.chars_len());
+            }
+        } else {
+            // not thai
+            position += 1;
+            set.insert(position);
+            txt = txt.slice_by_char_indice(1, txt.chars_len());
+        }
+    }
+    set
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::text::unicode::FixedWidthString;
+
+    #[test]
+    fn test_cluster_karan() {
+        let kr_result = find_cluster_boundaries(FixedWidthString::new("พิสูจน์ได้ค่ะ").raw_content());
+        assert!(kr_result.contains(&2));
+        assert!(kr_result.contains(&7));
+        assert!(kr_result.contains(&10));
+        assert!(kr_result.contains(&13));
+    }
+
+    #[test]
+    fn test_cluster_general_case() {
+        let gen_result =
+            find_cluster_boundaries(FixedWidthString::new("เรือน้อยลอยอยู่").raw_content());
+        assert!(gen_result.contains(&4));
+        assert!(gen_result.contains(&6));
+        assert!(gen_result.contains(&7));
+        assert!(gen_result.contains(&8));
+        assert!(gen_result.contains(&9));
+        assert!(gen_result.contains(&10));
+        assert!(gen_result.contains(&11));
+        assert!(gen_result.contains(&12));
+        assert!(gen_result.contains(&15));
+    }
 
     #[test]
     fn tcc_regex_test_cases() {
@@ -74,17 +141,32 @@ mod tests {
                 "^เc็ck",
                 r"^\x00เ\x00[ก-ฮ]\x00็\x00[ก-ฮ](\x00[ก-ฮ](\x00[ก-ฮ])?(\x00[ิุ-ู])?\x00[์])?",
             ),
-            ("^เcctาะ", r"^\x00เ\x00[ก-ฮ]\x00[ก-ฮ](\x00[่-๋])?\x00า\x00ะ"),
+            (
+                "^เcctาะ",
+                r"^\x00เ\x00[ก-ฮ]\x00[ก-ฮ](\x00[่-๋])?\x00า\x00ะ",
+            ),
             (
                 "^เccีtยะ",
                 r"^\x00เ\x00[ก-ฮ]\x00[ก-ฮ]\x00ี(\x00[่-๋])?\x00ย\x00ะ",
             ),
             ("^เcc็c", r"^\x00เ\x00[ก-ฮ]\x00[ก-ฮ]\x00็\x00[ก-ฮ]"),
-            ("^เcิc์c", r"^\x00เ\x00[ก-ฮ]\x00ิ\x00[ก-ฮ]\x00์\x00[ก-ฮ]"),
+            (
+                "^เcิc์c",
+                r"^\x00เ\x00[ก-ฮ]\x00ิ\x00[ก-ฮ]\x00์\x00[ก-ฮ]",
+            ),
             ("^เcิtc", r"^\x00เ\x00[ก-ฮ]\x00ิ(\x00[่-๋])?\x00[ก-ฮ]"),
-            ("^เcีtยะ?", r"^\x00เ\x00[ก-ฮ]\x00ี(\x00[่-๋])?\x00ย(\x00ะ)?"),
-            ("^เcืtอะ?", r"^\x00เ\x00[ก-ฮ]\x00ื(\x00[่-๋])?\x00อ(\x00ะ)?"),
-            ("^เctา?ะ?", r"^\x00เ\x00[ก-ฮ](\x00[่-๋])?(\x00า)?(\x00ะ)?"),
+            (
+                "^เcีtยะ?",
+                r"^\x00เ\x00[ก-ฮ]\x00ี(\x00[่-๋])?\x00ย(\x00ะ)?",
+            ),
+            (
+                "^เcืtอะ?",
+                r"^\x00เ\x00[ก-ฮ]\x00ื(\x00[่-๋])?\x00อ(\x00ะ)?",
+            ),
+            (
+                "^เctา?ะ?",
+                r"^\x00เ\x00[ก-ฮ](\x00[่-๋])?(\x00า)?(\x00ะ)?",
+            ),
             ("^cัtวะ", r"^\x00[ก-ฮ]\x00ั(\x00[่-๋])?\x00ว\x00ะ"),
             (
                 "^c[ัื]tc[ุิะ]?",
@@ -98,13 +180,16 @@ mod tests {
             ("^แcc์", r"^\x00แ\x00[ก-ฮ]\x00[ก-ฮ]\x00์"),
             ("^แctะ", r"^\x00แ\x00[ก-ฮ](\x00[่-๋])?\x00ะ"),
             ("^แcc็c", r"^\x00แ\x00[ก-ฮ]\x00[ก-ฮ]\x00็\x00[ก-ฮ]"),
-            ("^แccc์", r"^\x00แ\x00[ก-ฮ]\x00[ก-ฮ]\x00[ก-ฮ]\x00์"),
+            (
+                "^แccc์",
+                r"^\x00แ\x00[ก-ฮ]\x00[ก-ฮ]\x00[ก-ฮ]\x00์",
+            ),
             ("^โctะ", r"^\x00โ\x00[ก-ฮ](\x00[่-๋])?\x00ะ"),
             ("^[เ-ไ]ct", r"^\x00[เ-ไ]\x00[ก-ฮ](\x00[่-๋])?"),
         ];
 
         for (input, expected) in test_cases.iter() {
-            let result = regex_pattern_to_custom_pattern(&replace_tcc_symbol(input)).unwrap();
+            let result = to_fixed_width_pattern(&replace_tcc_symbol(input)).unwrap();
             assert_eq!(&result, expected, "Failed for input: {}", input);
         }
 
@@ -120,7 +205,7 @@ mod tests {
         ];
 
         for (input, expected) in look_ahead_cases.iter() {
-            let result = regex_pattern_to_custom_pattern(&replace_tcc_symbol(input)).unwrap();
+            let result = to_fixed_width_pattern(&replace_tcc_symbol(input)).unwrap();
             assert_eq!(&result, expected, "Failed for look-ahead input: {}", input);
         }
     }
@@ -143,7 +228,7 @@ mod tests {
         ];
 
         for (input, expected) in test_cases.iter() {
-            let result = regex_pattern_to_custom_pattern(input).unwrap();
+            let result = to_fixed_width_pattern(input).unwrap();
             assert_eq!(&result, expected, "Failed for input: {}", input);
         }
     }
