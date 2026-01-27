@@ -1,28 +1,21 @@
 [package]
-name = "thongna"
-version = "0.2.4"
+name = "thainlp-rs"
+version = "0.3.0"
 edition = "2021"
 license = "Apache-2.0"
 authors = ["Porameht Khumsombat"]
-description = "Blazing-fast Thai text processing library powered by Rust"
-repository = "https://github.com/porameht/thongna"
+description = "High-performance Thai NLP library - word segmentation, text normalization, and more"
+repository = "https://github.com/porameht/thainlp-rs"
 readme = "README.md"
 keywords = ["thai", "tokenizer", "nlp", "word-segmentation"]
 categories = ["text-processing", "internationalization"]
-exclude = [
-    "notebooks",
-    "tests",
-    ".github",
-    ".gitignore",
-]
+exclude = [".github", ".gitignore"]
+include = ["src/**/*", "data/**/*", "Cargo.toml", "README.md", "LICENSE"]
 
 [lib]
-name = "thongna"
-crate-type = ["cdylib"]
+name = "thainlp_rs"
 
 [dependencies]
-pyo3 = "0.22.0"
-lazy_static = "1.4.0"
 regex = "1"
 anyhow = "1.0.45"
 bytecount = "0.6.2"
@@ -31,3 +24,10 @@ rayon = "1.5.1"
 rustc-hash = "1.1.0"
 binary-heap-plus = "0.4.1"
 once_cell = "1.18.0"
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "bm25_benchmark"
+harness = false
