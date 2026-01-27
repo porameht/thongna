@@ -4,7 +4,7 @@
 //! and querying Thai words in the dictionary.
 
 use crate::text::unicode::{
-    FixedWidthBytesSlice, FixedWidthBytesVec, FixedWidthString, FixedCharsLengthByteSlice,
+    FixedCharsLengthByteSlice, FixedWidthBytesSlice, FixedWidthBytesVec, FixedWidthString,
 };
 
 use rustc_hash::{FxHashMap as HashMap, FxHashSet as HashSet};
@@ -60,22 +60,22 @@ impl TrieNode {
             .add_word(&input_word.substring(1, input_word.chars_len()));
     }
 
-    fn remove_word(&mut self, input_word: &FixedWidthString) {
-        let mut word = input_word;
+    fn remove_word(&mut self, word: &FixedWidthString) {
         let char_count = word.chars_len();
-        if char_count >= 1 {
-            let character = word.get_chars_content().first().unwrap();
-            if let Some(child) = self.find_mut_child(character) {
-                let substring_of_word = word.substring(1, word.chars_len());
-                if char_count == 1 {
-                    child.set_not_end();
-                }
-                word = &substring_of_word;
-                child.remove_word(word);
-                if !child.end && child.children.is_empty() {
-                    self.remove_child(character);
-                }
-            };
+        if char_count == 0 {
+            return;
+        }
+
+        let character = word.get_chars_content().first().unwrap();
+        if let Some(child) = self.find_mut_child(character) {
+            if char_count == 1 {
+                child.set_not_end();
+            }
+            let substring = word.substring(1, char_count);
+            child.remove_word(&substring);
+            if !child.end && child.children.is_empty() {
+                self.remove_child(character);
+            }
         }
     }
 }
@@ -150,25 +150,21 @@ impl DictionaryTrie {
         dict_trie: &Self,
     ) -> Vec<&'p FixedWidthBytesSlice> {
         let mut result: Vec<&[u8]> = vec![];
-        let prefix_cpy = prefix;
-        let mut current_index = 0;
-        let mut current_node_wrap = Some(&dict_trie.root);
-        while current_index < prefix_cpy.chars_len() {
-            let character = prefix_cpy.get_char_at(current_index);
-            if let Some(current_node) = current_node_wrap {
-                if let Some(child) = current_node.find_child(&character) {
-                    if child.end {
-                        let substring_of_prefix = prefix_cpy
-                            .raw_content()
-                            .slice_by_char_indice(0, current_index + 1);
-                        result.push(substring_of_prefix);
-                    }
-                    current_node_wrap = Some(child);
-                } else {
-                    break;
-                }
+        let mut current_node = &dict_trie.root;
+
+        for current_index in 0..prefix.chars_len() {
+            let character = prefix.get_char_at(current_index);
+            let Some(child) = current_node.find_child(&character) else {
+                break;
+            };
+
+            if child.end {
+                let substring = prefix
+                    .raw_content()
+                    .slice_by_char_indice(0, current_index + 1);
+                result.push(substring);
             }
-            current_index += 1;
+            current_node = child;
         }
         result
     }

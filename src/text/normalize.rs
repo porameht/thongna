@@ -7,8 +7,8 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 
 static NORMALIZE_RULE1: [&str; 23] = [
-    "ะ", "ั", "็", "า", "ิ", "ี", "ึ", "่", "ํ", "ุ", "ู", "ใ", "ไ", "โ", "ื", "่", "้", "๋", "๊",
-    "ึ", "์", "๋", "ำ",
+    "ะ", "ั", "็", "า", "ิ", "ี", "ึ", "่", "ํ", "ุ", "ู", "ใ", "ไ", "โ", "ื", "่", "้", "๋", "๊", "ึ", "์", "๋",
+    "ำ",
 ];
 
 static NORMALIZE_RULE2: [(&str, &str); 9] = [
@@ -79,26 +79,24 @@ static NORMALIZE_RULE1_COMPILED: Lazy<Vec<(Regex, &'static str)>> = Lazy::new(||
 /// let normalized = normalize(text, true);
 /// ```
 pub fn normalize(text: &str, whitespace_number: bool) -> String {
-    let mut text = text.to_string();
+    let mut result = if whitespace_number {
+        WHITESPACE_NUMBER_RE.replace_all(text, " $1 ").into_owned()
+    } else {
+        text.to_string()
+    };
 
-    if whitespace_number {
-        text = WHITESPACE_NUMBER_RE
-            .replace_all(&text, " $1 ")
-            .into_owned();
-    }
-
-    text = text.replace('\u{200b}', "");
-    text = MULTIPLE_SPACES_RE.replace_all(&text, " ").into_owned();
-    text = MULTIPLE_TABS_RE.replace_all(&text, "\t").into_owned();
-    text = MULTIPLE_NEWLINES_RE.replace_all(&text, "\n").into_owned();
+    result = result.replace('\u{200b}', "");
+    result = MULTIPLE_SPACES_RE.replace_all(&result, " ").into_owned();
+    result = MULTIPLE_TABS_RE.replace_all(&result, "\t").into_owned();
+    result = MULTIPLE_NEWLINES_RE.replace_all(&result, "\n").into_owned();
 
     for (re, replacement) in NORMALIZE_RULE2_COMPILED.iter() {
-        text = re.replace_all(&text, *replacement).into_owned();
+        result = re.replace_all(&result, *replacement).into_owned();
     }
 
     for (re, rule) in NORMALIZE_RULE1_COMPILED.iter() {
-        text = re.replace_all(&text, *rule).into_owned();
+        result = re.replace_all(&result, *rule).into_owned();
     }
 
-    text
+    result
 }

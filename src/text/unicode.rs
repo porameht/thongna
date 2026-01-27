@@ -133,14 +133,10 @@ impl FixedCharsLengthByteSlice for &FixedWidthBytesSlice {
 pub fn rfind_space_char_index(fixed_width_text: &FixedWidthBytesSlice) -> Option<usize> {
     assert_eq!(fixed_width_text.len() % 4, 0);
 
-    for index in (0..(fixed_width_text.len() / BYTES_PER_CHAR)).rev() {
-        if let SPACE_BYTE =
-            &fixed_width_text[(index) * BYTES_PER_CHAR..(index + 1) * BYTES_PER_CHAR]
-        {
-            return Some(index);
-        }
-    }
-    None
+    let char_count = fixed_width_text.len() / BYTES_PER_CHAR;
+    (0..char_count).rev().find(|&index| {
+        &fixed_width_text[index * BYTES_PER_CHAR..(index + 1) * BYTES_PER_CHAR] == SPACE_BYTE
+    })
 }
 
 /// Check if a white space (including left-to-right and right-to-left marks)
@@ -184,22 +180,22 @@ fn is_whitespace(fixed_width_bytes: &FixedWidthBytesSlice) -> bool {
 }
 
 fn to_four_bytes(input: &str) -> FixedWidthBytesVec {
-    let output_size = num_chars(input.as_bytes());
-    let mut output_vec: Vec<u8> = Vec::with_capacity(output_size * 2);
-    for character in input.chars() {
-        let mut bytes_buffer: [u8; 4] = [0; 4];
+    let char_count = num_chars(input.as_bytes());
+    let mut output = Vec::with_capacity(char_count * BYTES_PER_CHAR);
 
-        character.encode_utf8(&mut bytes_buffer);
-        let arranged_buffer = match bytes_buffer {
+    for character in input.chars() {
+        let mut bytes: [u8; 4] = [0; 4];
+        character.encode_utf8(&mut bytes);
+
+        let padded = match bytes {
             [a, 0, 0, 0] => [0, 0, 0, a],
             [a, b, 0, 0] => [0, 0, a, b],
             [a, b, c, 0] => [0, a, b, c],
-            _ => bytes_buffer,
+            _ => bytes,
         };
-
-        output_vec.extend_from_slice(&arranged_buffer);
+        output.extend_from_slice(&padded);
     }
-    output_vec
+    output
 }
 
 fn trim_to_std_utf8(
@@ -463,7 +459,9 @@ fn test_trim() {
     assert!(FixedWidthString::new("  \t\n ").trim().is_empty());
     assert_eq!(FixedWidthString::new(" abc ").trim().chars_len(), 3);
     assert_eq!(
-        FixedWidthString::new(" aก  ").trim().full_string_bytes_len(),
+        FixedWidthString::new(" aก  ")
+            .trim()
+            .full_string_bytes_len(),
         8
     ); // 2 chars * 4 bytes
 }

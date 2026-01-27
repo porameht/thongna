@@ -103,9 +103,7 @@ impl ToFixedWidthRepr for LiteralEnum {
     fn to_fixed_width_repr(&self) -> Result<String> {
         match self {
             LiteralEnum::Unicode(a) => Ok(a.to_four_byte_string()),
-            LiteralEnum::Byte(_) => {
-                Err(AnyError::new(UnsupportedPatternError::ByteLiteral))
-            }
+            LiteralEnum::Byte(_) => Err(AnyError::new(UnsupportedPatternError::ByteLiteral)),
         }
     }
 }
@@ -121,16 +119,16 @@ impl ToFixedWidthRepr for Class {
 
 impl ToFixedWidthRepr for Repetition {
     fn to_fixed_width_repr(&self) -> Result<String> {
-        let symbol: Result<String> = match &self.kind {
-            regex_syntax::hir::RepetitionKind::ZeroOrOne => Ok("?".to_string()),
-            regex_syntax::hir::RepetitionKind::ZeroOrMore => Ok("*".to_string()),
-            regex_syntax::hir::RepetitionKind::OneOrMore => Ok("+".to_string()),
-            regex_syntax::hir::RepetitionKind::Range(r) => match r {
-                regex_syntax::hir::RepetitionRange::Exactly(e) => Ok(format!("{{{}}}", e)),
-                regex_syntax::hir::RepetitionRange::AtLeast(l) => Ok(format!("{{{},}}", l)),
-                regex_syntax::hir::RepetitionRange::Bounded(start, end) => {
-                    Ok(format!("{{{},{}}}", start, end))
-                }
+        use regex_syntax::hir::{RepetitionKind, RepetitionRange};
+
+        let symbol = match &self.kind {
+            RepetitionKind::ZeroOrOne => "?".to_string(),
+            RepetitionKind::ZeroOrMore => "*".to_string(),
+            RepetitionKind::OneOrMore => "+".to_string(),
+            RepetitionKind::Range(r) => match r {
+                RepetitionRange::Exactly(e) => format!("{{{}}}", e),
+                RepetitionRange::AtLeast(l) => format!("{{{},}}", l),
+                RepetitionRange::Bounded(start, end) => format!("{{{},{}}}", start, end),
             },
         };
 
@@ -146,118 +144,57 @@ impl ToFixedWidthRepr for Repetition {
             HirKind::Alternation(a) => {
                 IterableHirKind::Alternation(a.to_vec()).to_fixed_width_repr()
             }
-        };
-        if let HirKind::Group(_) = &self.hir.kind() {
-            Ok(repeated_expression? + &symbol?)
+        }?;
+
+        if matches!(self.hir.kind(), HirKind::Group(_)) {
+            Ok(format!("{}{}", repeated_expression, symbol))
         } else {
-            Ok("(".to_owned() + &repeated_expression? + ")" + &symbol?)
+            Ok(format!("({}){}", repeated_expression, symbol))
         }
+    }
+}
+
+/// Convert a single HIR member to its fixed-width representation.
+fn member_to_fixed_width(member: &Hir) -> Result<String> {
+    match member.kind() {
+        HirKind::Empty => todo!(),
+        HirKind::Literal(lit) => lit.to_fixed_width_repr(),
+        HirKind::Class(c) => c.to_fixed_width_repr(),
+        HirKind::Anchor(a) => a.to_fixed_width_repr(),
+        HirKind::WordBoundary(_) => todo!(),
+        HirKind::Repetition(r) => r.to_fixed_width_repr(),
+        HirKind::Group(g) => g.to_fixed_width_repr(),
+        HirKind::Concat(c) => IterableHirKind::Concat(c.to_vec()).to_fixed_width_repr(),
+        HirKind::Alternation(a) => IterableHirKind::Alternation(a.to_vec()).to_fixed_width_repr(),
     }
 }
 
 impl ToFixedWidthRepr for IterableHirKind {
     fn to_fixed_width_repr(&self) -> Result<String> {
         match self {
-            IterableHirKind::Alternation(a) => {
-                let mut cus_str = String::new();
-                for member in a {
-                    match member.kind() {
-                        HirKind::Empty => todo!(),
-                        HirKind::Literal(literal) => {
-                            if !cus_str.is_empty() {
-                                cus_str = cus_str
-                                    + "|"
-                                    + format!("({})", &literal.to_fixed_width_repr()?).as_str();
-                            } else {
-                                cus_str = format!("({})", &literal.to_fixed_width_repr()?);
-                            }
-                        }
-                        HirKind::Class(c) => {
-                            if !cus_str.is_empty() {
-                                cus_str = cus_str
-                                    + "|"
-                                    + format!("({})", &c.to_fixed_width_repr()?).as_str();
-                            } else {
-                                cus_str = format!("({})", &c.to_fixed_width_repr()?);
-                            }
-                        }
-                        HirKind::Anchor(a) => {
-                            if !cus_str.is_empty() {
-                                cus_str = cus_str
-                                    + "|"
-                                    + format!("({})", &a.to_fixed_width_repr()?).as_str();
-                            } else {
-                                cus_str = format!("({})", &a.to_fixed_width_repr()?);
-                            }
-                        }
-                        HirKind::WordBoundary(_) => todo!(),
-                        HirKind::Repetition(r) => {
-                            if !cus_str.is_empty() {
-                                cus_str = cus_str
-                                    + "|"
-                                    + format!("({})", &r.to_fixed_width_repr()?).as_str();
-                            } else {
-                                cus_str = format!("({})", &r.to_fixed_width_repr()?);
-                            }
-                        }
-                        HirKind::Group(g) => {
-                            if !cus_str.is_empty() {
-                                cus_str = cus_str
-                                    + "|"
-                                    + format!("({})", &g.to_fixed_width_repr()?).as_str();
-                            } else {
-                                cus_str = format!("({})", &g.to_fixed_width_repr()?);
-                            }
-                        }
-                        HirKind::Concat(concat) => {
-                            if !cus_str.is_empty() {
-                                cus_str = cus_str
-                                    + "|"
-                                    + format!(
-                                        "({})",
-                                        (&IterableHirKind::Concat(concat.to_vec())
-                                            .to_fixed_width_repr()?)
-                                    )
-                                    .as_str();
-                            } else {
-                                cus_str = IterableHirKind::Concat(concat.to_vec())
-                                    .to_fixed_width_repr()?;
-                            }
-                        }
-                        HirKind::Alternation(alternation) => {
-                            cus_str = cus_str
-                                + &IterableHirKind::Alternation(alternation.to_vec())
-                                    .to_fixed_width_repr()?;
-                        }
+            IterableHirKind::Alternation(members) => {
+                let mut result = String::new();
+                for member in members {
+                    let repr = member_to_fixed_width(member)?;
+
+                    if matches!(member.kind(), HirKind::Alternation(_)) {
+                        result.push_str(&repr);
+                    } else if result.is_empty() && matches!(member.kind(), HirKind::Concat(_)) {
+                        result = repr;
+                    } else if result.is_empty() {
+                        result = format!("({})", repr);
+                    } else {
+                        result.push_str(&format!("|({})", repr));
                     }
                 }
-                Ok(cus_str)
+                Ok(result)
             }
-            IterableHirKind::Concat(c) => {
-                let mut cus_str = String::new();
-                for member in c {
-                    match member.kind() {
-                        HirKind::Empty => todo!(),
-                        HirKind::Literal(literal) => {
-                            cus_str = cus_str + &literal.to_fixed_width_repr()?;
-                        }
-                        HirKind::Class(c) => cus_str = cus_str + &c.to_fixed_width_repr()?,
-                        HirKind::Anchor(a) => cus_str = cus_str + &a.to_fixed_width_repr()?,
-                        HirKind::WordBoundary(_) => todo!(),
-                        HirKind::Repetition(r) => cus_str = cus_str + &r.to_fixed_width_repr()?,
-                        HirKind::Group(g) => cus_str = cus_str + &g.to_fixed_width_repr()?,
-                        HirKind::Concat(concat) => {
-                            cus_str = cus_str
-                                + &IterableHirKind::Concat(concat.to_vec()).to_fixed_width_repr()?;
-                        }
-                        HirKind::Alternation(alternation) => {
-                            cus_str = cus_str
-                                + &(IterableHirKind::Alternation(alternation.to_vec())
-                                    .to_fixed_width_repr()?);
-                        }
-                    }
+            IterableHirKind::Concat(members) => {
+                let mut result = String::new();
+                for member in members {
+                    result.push_str(&member_to_fixed_width(member)?);
                 }
-                Ok(cus_str)
+                Ok(result)
             }
         }
     }
@@ -265,7 +202,7 @@ impl ToFixedWidthRepr for IterableHirKind {
 
 impl ToFixedWidthRepr for Group {
     fn to_fixed_width_repr(&self) -> Result<String> {
-        let recur = match self.hir.kind() {
+        let inner = match self.hir.kind() {
             HirKind::Empty => todo!(),
             HirKind::Literal(lit) => lit.to_fixed_width_repr(),
             HirKind::Class(c) => c.to_fixed_width_repr(),
@@ -277,8 +214,8 @@ impl ToFixedWidthRepr for Group {
             HirKind::Alternation(a) => {
                 IterableHirKind::Alternation(a.to_vec()).to_fixed_width_repr()
             }
-        };
-        Ok("(".to_owned() + &recur? + ")")
+        }?;
+        Ok(format!("({})", inner))
     }
 }
 
@@ -374,27 +311,21 @@ impl PadLeftZeroFourBytesRep for &[ClassUnicodeRange] {
 
 impl PadLeftZeroFourBytesRep for char {
     fn to_four_byte_string(&self) -> String {
-        let character = self;
-
         let mut bytes_buffer: [u8; 4] = [0; 4];
-        character.encode_utf8(&mut bytes_buffer);
-        let result = match bytes_buffer {
-            [_a, 0, 0, 0] => {
-                if character.is_alphanumeric() || (character.is_whitespace() && *character == ' ') {
-                    format!(r"\x00\x00\x00{}", character)
+        self.encode_utf8(&mut bytes_buffer);
+
+        match bytes_buffer {
+            [_, 0, 0, 0] => {
+                if self.is_alphanumeric() || *self == ' ' {
+                    format!(r"\x00\x00\x00{}", self)
                 } else {
-                    format!(r"\x00\x00\x00{:?}", character).replace('\'', "")
+                    format!(r"\x00\x00\x00{:?}", self).replace('\'', "")
                 }
             }
-            [_a, _b, 0, 0] => {
-                format!(r"\x00\x00{}", character)
-            }
-            [_a, _b, _c, 0] => {
-                format!(r"\x00{}", character)
-            }
-            _ => character.to_string(),
-        };
-        result
+            [_, _, 0, 0] => format!(r"\x00\x00{}", self),
+            [_, _, _, 0] => format!(r"\x00{}", self),
+            _ => self.to_string(),
+        }
     }
 }
 

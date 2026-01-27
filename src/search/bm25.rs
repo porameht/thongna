@@ -80,9 +80,7 @@ pub struct WhitespaceTokenizer;
 
 impl Tokenizer for WhitespaceTokenizer {
     fn tokenize(&self, text: &str) -> Vec<String> {
-        text.split_whitespace()
-            .map(|s| s.to_lowercase())
-            .collect()
+        text.split_whitespace().map(|s| s.to_lowercase()).collect()
     }
 }
 
@@ -151,10 +149,9 @@ impl<T: Tokenizer> BM25<T> {
 
     #[inline(always)]
     fn avg_doc_length(&self) -> f32 {
-        if self.doc_count == 0 {
-            1.0
-        } else {
-            self.total_doc_length as f32 / self.doc_count as f32
+        match self.doc_count {
+            0 => 1.0,
+            n => self.total_doc_length as f32 / n as f32,
         }
     }
 
@@ -321,12 +318,6 @@ impl<T: Tokenizer> BM25<T> {
     /// Best for very large batches (10,000+ texts) or heavy tokenizers.
     pub fn embed_batch_par(&self, texts: &[&str]) -> Vec<SparseEmbedding> {
         texts.par_iter().map(|t| self.embed(t)).collect()
-    }
-
-    /// Alias for `embed_batch_par` (backward compatibility).
-    #[deprecated(since = "0.3.1", note = "Use `embed_batch` or `embed_batch_par` instead")]
-    pub fn embed_many(&self, texts: &[&str]) -> Vec<SparseEmbedding> {
-        self.embed_batch_par(texts)
     }
 
     /// Embed multiple pre-tokenized texts (auto-selects parallel or sequential).

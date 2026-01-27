@@ -17,5 +17,5 @@
 pub mod bm25;
 pub mod thai;
 
-pub use bm25::{BM25, SparseEmbedding, Tokenizer, WhitespaceTokenizer};
+pub use bm25::{SparseEmbedding, Tokenizer, WhitespaceTokenizer, BM25};
 pub use thai::{thai_bm25, ThaiTokenizer};

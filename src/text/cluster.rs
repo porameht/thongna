@@ -4,7 +4,7 @@
 //! which are used to constrain word segmentation positions.
 
 use super::pattern::to_fixed_width_pattern;
-use super::unicode::{FixedWidthBytesSlice, FixedCharsLengthByteSlice, BYTES_PER_CHAR};
+use super::unicode::{FixedCharsLengthByteSlice, FixedWidthBytesSlice, BYTES_PER_CHAR};
 
 use once_cell::sync::Lazy;
 use regex::bytes::Regex;
@@ -80,27 +80,23 @@ pub fn find_cluster_boundaries(fixed_width_text: &FixedWidthBytesSlice) -> HashS
     let mut position: usize = 0;
 
     while !txt.is_empty() {
-        if let Some(result) = NON_LOOKAHEAD_TCC.find(txt) {
-            let matched = &txt[result.start()..result.end()];
-            let match_length = matched.len();
+        let segment_size = match NON_LOOKAHEAD_TCC.find(txt) {
+            Some(result) => {
+                let matched = &txt[result.start()..result.end()];
+                let match_length = matched.len();
 
-            if LOOKAHEAD_TCC.is_match(matched) {
-                let end_char_index = (match_length - BYTES_PER_CHAR) / BYTES_PER_CHAR;
-                position += end_char_index;
-                set.insert(position);
-                txt = txt.slice_by_char_indice(end_char_index, txt.chars_len());
-            } else {
-                let segment_size = match_length / BYTES_PER_CHAR;
-                position += segment_size;
-                set.insert(position);
-                txt = txt.slice_by_char_indice(segment_size, txt.chars_len());
+                if LOOKAHEAD_TCC.is_match(matched) {
+                    (match_length - BYTES_PER_CHAR) / BYTES_PER_CHAR
+                } else {
+                    match_length / BYTES_PER_CHAR
+                }
             }
-        } else {
-            // not thai
-            position += 1;
-            set.insert(position);
-            txt = txt.slice_by_char_indice(1, txt.chars_len());
-        }
+            None => 1, // not thai
+        };
+
+        position += segment_size;
+        set.insert(position);
+        txt = txt.slice_by_char_indice(segment_size, txt.chars_len());
     }
     set
 }
@@ -141,32 +137,17 @@ mod tests {
                 "^เc็ck",
                 r"^\x00เ\x00[ก-ฮ]\x00็\x00[ก-ฮ](\x00[ก-ฮ](\x00[ก-ฮ])?(\x00[ิุ-ู])?\x00[์])?",
             ),
-            (
-                "^เcctาะ",
-                r"^\x00เ\x00[ก-ฮ]\x00[ก-ฮ](\x00[่-๋])?\x00า\x00ะ",
-            ),
+            ("^เcctาะ", r"^\x00เ\x00[ก-ฮ]\x00[ก-ฮ](\x00[่-๋])?\x00า\x00ะ"),
             (
                 "^เccีtยะ",
                 r"^\x00เ\x00[ก-ฮ]\x00[ก-ฮ]\x00ี(\x00[่-๋])?\x00ย\x00ะ",
             ),
             ("^เcc็c", r"^\x00เ\x00[ก-ฮ]\x00[ก-ฮ]\x00็\x00[ก-ฮ]"),
-            (
-                "^เcิc์c",
-                r"^\x00เ\x00[ก-ฮ]\x00ิ\x00[ก-ฮ]\x00์\x00[ก-ฮ]",
-            ),
+            ("^เcิc์c", r"^\x00เ\x00[ก-ฮ]\x00ิ\x00[ก-ฮ]\x00์\x00[ก-ฮ]"),
             ("^เcิtc", r"^\x00เ\x00[ก-ฮ]\x00ิ(\x00[่-๋])?\x00[ก-ฮ]"),
-            (
-                "^เcีtยะ?",
-                r"^\x00เ\x00[ก-ฮ]\x00ี(\x00[่-๋])?\x00ย(\x00ะ)?",
-            ),
-            (
-                "^เcืtอะ?",
-                r"^\x00เ\x00[ก-ฮ]\x00ื(\x00[่-๋])?\x00อ(\x00ะ)?",
-            ),
-            (
-                "^เctา?ะ?",
-                r"^\x00เ\x00[ก-ฮ](\x00[่-๋])?(\x00า)?(\x00ะ)?",
-            ),
+            ("^เcีtยะ?", r"^\x00เ\x00[ก-ฮ]\x00ี(\x00[่-๋])?\x00ย(\x00ะ)?"),
+            ("^เcืtอะ?", r"^\x00เ\x00[ก-ฮ]\x00ื(\x00[่-๋])?\x00อ(\x00ะ)?"),
+            ("^เctา?ะ?", r"^\x00เ\x00[ก-ฮ](\x00[่-๋])?(\x00า)?(\x00ะ)?"),
             ("^cัtวะ", r"^\x00[ก-ฮ]\x00ั(\x00[่-๋])?\x00ว\x00ะ"),
             (
                 "^c[ัื]tc[ุิะ]?",
@@ -180,10 +161,7 @@ mod tests {
             ("^แcc์", r"^\x00แ\x00[ก-ฮ]\x00[ก-ฮ]\x00์"),
             ("^แctะ", r"^\x00แ\x00[ก-ฮ](\x00[่-๋])?\x00ะ"),
             ("^แcc็c", r"^\x00แ\x00[ก-ฮ]\x00[ก-ฮ]\x00็\x00[ก-ฮ]"),
-            (
-                "^แccc์",
-                r"^\x00แ\x00[ก-ฮ]\x00[ก-ฮ]\x00[ก-ฮ]\x00์",
-            ),
+            ("^แccc์", r"^\x00แ\x00[ก-ฮ]\x00[ก-ฮ]\x00[ก-ฮ]\x00์"),
             ("^โctะ", r"^\x00โ\x00[ก-ฮ](\x00[่-๋])?\x00ะ"),
             ("^[เ-ไ]ct", r"^\x00[เ-ไ]\x00[ก-ฮ](\x00[่-๋])?"),
         ];

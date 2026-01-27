@@ -58,22 +58,15 @@ static DICT_COLLECTION: Lazy<RwLock<HashMap<String, NewmmSegmenter>>> =
 /// load_dict("dict.txt", "default").unwrap();
 /// let tokens = segment("สวัสดีครับ", "default", false, false).unwrap();
 /// ```
-pub fn segment(
-    text: &str,
-    dict_name: &str,
-    safe: bool,
-    parallel: bool,
-) -> Result<Vec<String>> {
+pub fn segment(text: &str, dict_name: &str, safe: bool, parallel: bool) -> Result<Vec<String>> {
     let dict_collection = DICT_COLLECTION
         .read()
         .map_err(|e| Error::LockError(e.to_string()))?;
 
-    if let Some(loaded_dict) = dict_collection.get(dict_name) {
-        let result = loaded_dict.segment_to_string(text, safe, parallel);
-        Ok(result)
-    } else {
-        Err(Error::DictionaryNotFound(dict_name.to_string()))
-    }
+    dict_collection
+        .get(dict_name)
+        .map(|segmenter| segmenter.segment_to_string(text, safe, parallel))
+        .ok_or_else(|| Error::DictionaryNotFound(dict_name.to_string()))
 }
 
 /// Load dictionary from a file.
@@ -103,35 +96,30 @@ pub fn load_dict(file_path: &str, dict_name: &str) -> Result<(String, bool)> {
         .write()
         .map_err(|e| Error::LockError(e.to_string()))?;
 
-    if dict_col_lock.get(dict_name).is_some() {
-        Ok((
+    if dict_col_lock.contains_key(dict_name) {
+        return Ok((
             format!(
                 "Failed: dictionary name {} already exists, please use another name.",
                 dict_name
             ),
             false,
-        ))
-    } else {
-        let segmenter = NewmmSegmenter::new(file_path);
-        dict_col_lock.insert(dict_name.to_owned(), segmenter);
-
-        Ok((
-            format!(
-                "Successful: file {} has been successfully loaded to dictionary name {}.",
-                file_path, dict_name
-            ),
-            true,
-        ))
+        ));
     }
+
+    let segmenter = NewmmSegmenter::new(file_path);
+    dict_col_lock.insert(dict_name.to_owned(), segmenter);
+
+    Ok((
+        format!(
+            "Successful: file {} has been successfully loaded to dictionary name {}.",
+            file_path, dict_name
+        ),
+        true,
+    ))
 }
 
 // Legacy API compatibility
 #[deprecated(since = "0.3.0", note = "Use `segment` instead")]
-pub fn newmm(
-    text: &str,
-    dict_name: &str,
-    safe: bool,
-    parallel: bool,
-) -> Result<Vec<String>> {
+pub fn newmm(text: &str, dict_name: &str, safe: bool, parallel: bool) -> Result<Vec<String>> {
     segment(text, dict_name, safe, parallel)
 }

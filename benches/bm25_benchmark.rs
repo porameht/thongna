@@ -18,11 +18,40 @@ fn as_refs(strings: &[String]) -> Vec<&str> {
 /// Generate sample documents for benchmarking.
 fn generate_docs(count: usize) -> Vec<String> {
     let base_words = [
-        "the", "quick", "brown", "fox", "jumps", "over", "lazy", "dog",
-        "hello", "world", "rust", "programming", "language", "fast", "safe",
-        "memory", "system", "performance", "benchmark", "test", "data",
-        "search", "index", "document", "query", "score", "ranking", "sparse",
-        "embedding", "vector", "machine", "learning", "natural", "processing",
+        "the",
+        "quick",
+        "brown",
+        "fox",
+        "jumps",
+        "over",
+        "lazy",
+        "dog",
+        "hello",
+        "world",
+        "rust",
+        "programming",
+        "language",
+        "fast",
+        "safe",
+        "memory",
+        "system",
+        "performance",
+        "benchmark",
+        "test",
+        "data",
+        "search",
+        "index",
+        "document",
+        "query",
+        "score",
+        "ranking",
+        "sparse",
+        "embedding",
+        "vector",
+        "machine",
+        "learning",
+        "natural",
+        "processing",
     ];
 
     (0..count)
@@ -55,7 +84,10 @@ fn generate_queries(count: usize) -> Vec<String> {
 }
 
 /// Benchmark fit strategies (seq vs par vs auto) for given sizes.
-fn bench_fit_for_sizes(group: &mut criterion::BenchmarkGroup<criterion::measurement::WallTime>, sizes: &[usize]) {
+fn bench_fit_for_sizes(
+    group: &mut criterion::BenchmarkGroup<criterion::measurement::WallTime>,
+    sizes: &[usize],
+) {
     for &size in sizes {
         let docs = generate_docs(size);
         let doc_refs = as_refs(&docs);
@@ -163,9 +195,11 @@ fn bench_corpus_scaling(c: &mut Criterion) {
         bm25.fit_batch(&as_refs(&corpus));
         bm25.build_cache();
 
-        group.bench_with_input(BenchmarkId::new("embed_100_queries", size), &size, |b, _| {
-            b.iter(|| bm25.embed_batch_seq(black_box(&query_refs)))
-        });
+        group.bench_with_input(
+            BenchmarkId::new("embed_100_queries", size),
+            &size,
+            |b, _| b.iter(|| bm25.embed_batch_seq(black_box(&query_refs))),
+        );
     }
 
     group.finish();

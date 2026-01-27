@@ -34,4 +34,3 @@ impl Tokenizer for ThaiTokenizer {
 pub fn thai_bm25(dict_path: &str) -> BM25<ThaiTokenizer> {
     BM25::with_tokenizer(ThaiTokenizer::new(dict_path))
 }
-
